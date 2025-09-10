@@ -88,7 +88,7 @@ const VIPWesternPage: React.FC = () => {
       page: page.toString(),
       sortBy: "postDate",
       sortOrder: "DESC",
-      limit: "20",
+      limit: "900",
     });
 
     // instruções de data para o backend, se suportadas

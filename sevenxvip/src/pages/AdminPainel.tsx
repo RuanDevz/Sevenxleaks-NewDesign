@@ -127,7 +127,8 @@ const AdminPanel: React.FC = () => {
       const config = tabConfig[activeTab];
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: "20",
+        sortOrder: "DESC",
+        limit: "900",
       });
 
       const response = await axios.get<{ data: string }>(
