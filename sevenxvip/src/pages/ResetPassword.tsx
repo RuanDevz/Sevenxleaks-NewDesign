@@ -31,31 +31,38 @@ const ResetPassword: React.FC = () => {
     e.preventDefault();
     setMessage("");
     setError("");
-    setIsLoading(true);
 
-    if (newPassword !== confirmPassword) {
-      setError("Passwords don't match.");
-      setIsLoading(false);
+    if (!token) {
+      setError("Token ausente na URL.");
       return;
     }
 
-    try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_BACKEND_URL}/reset-password/account`,
-        { token, password: newPassword },
-        {
-          headers: {
-            "x-api-key": `${import.meta.env.VITE_FRONTEND_API_KEY}`,
-          },
-        }
-      );
+    if (newPassword !== confirmPassword) {
+      setError("Passwords don't match.");
+      return;
+    }
 
-      setMessage(response.data.message || "Password reset successfully!");
+    setIsLoading(true);
+    try {
+      const url = `${import.meta.env.VITE_BACKEND_URL}/reset-password`;
+      const payload = { token, password: newPassword };
+
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (import.meta.env.VITE_FRONTEND_API_KEY) {
+        headers["x-api-key"] = import.meta.env.VITE_FRONTEND_API_KEY as string;
+      }
+
+      const res = await axios.post(url, payload, { headers });
+      setMessage(res.data?.message || "Password reset successfully.");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (err) {
+    } catch (err: any) {
+      const apiMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        "Error resetting password. Please try again.";
+      setError(apiMsg);
       console.error(err);
-      setError("Error resetting password. Please try again.");
     } finally {
       setIsLoading(false);
     }
