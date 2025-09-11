@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Helmet } from "react-helmet";
 import { useTheme } from "../contexts/ThemeContext";
@@ -22,6 +22,19 @@ type Category = {
   id: string;
   name: string;
   category: string;
+};
+
+const getPath = (l: LinkItem) => {
+  const ct = l.contentType || "asian";
+  if (ct === "asian") {
+    if (l.category === "Banned") return `/banned/${l.slug}`;
+    if (l.category === "Unknown") return `/unknown/${l.slug}`;
+    return `/asian/${l.slug}`;
+  }
+  if (ct === "banned") return `/banned/${l.slug}`;
+  if (ct === "unknown") return `/unknown/${l.slug}`;
+  if (ct === "vip") return `/vip/${l.slug}`;
+  return `/western/${l.slug}`;
 };
 
 const LoadingSpinner = () => (
@@ -318,6 +331,9 @@ const WesternPage: React.FC = () => {
                       {posts
                         .sort((a, b) => new Date(b.postDate || b.createdAt).getTime() - new Date(a.postDate || a.createdAt).getTime())
                         .map((link, index) => (
+                       <Link to={getPath(link)}
+                        className="relative block rounded-xl p-3 focus:outline-none"
+                        draggable={false}>
                         <motion.div
                           key={link.id}
                           initial={{ opacity: 0, y: 20 }}
@@ -328,37 +344,6 @@ const WesternPage: React.FC = () => {
                               ? 'bg-gray-800/60 hover:bg-gray-700/80 border-gray-700/50 hover:border-orange-500/50 hover:shadow-orange-500/10'
                               : 'bg-white/60 hover:bg-gray-50/80 border-gray-200/50 hover:border-orange-400/50 hover:shadow-orange-400/10'
                           } border`}
-                          onClick={() => {
-                            const contentType = link.contentType || 'western';
-                            switch (contentType) {
-                              case 'asian':
-                                if (link.category === 'Banned') {
-                                  navigate(`/banned/${link.slug}`);
-                                } else if (link.category === 'Unknown') {
-                                  navigate(`/unknown/${link.slug}`);
-                                } else {
-                                  navigate(`/asian/${link.slug}`);
-                                }
-                                break;
-                              case 'banned':
-                                navigate(`/banned/${link.slug}`);
-                                break;
-                              case 'unknown':
-                                navigate(`/unknown/${link.slug}`);
-                                break;
-                              case 'vip':
-                                navigate(`/vip/${link.slug}`);
-                                break;
-                              default:
-                                if (link.category === 'Banned') {
-                                  navigate(`/banned/${link.slug}`);
-                                } else if (link.category === 'Unknown') {
-                                  navigate(`/unknown/${link.slug}`);
-                                } else {
-                                  navigate(`/western/${link.slug}`);
-                                }
-                            }
-                          }}
                         >
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
@@ -404,6 +389,7 @@ const WesternPage: React.FC = () => {
                             </div>
                           </div>
                         </motion.div>
+                       </Link>
                         ))}
                     </div>
                   </div>

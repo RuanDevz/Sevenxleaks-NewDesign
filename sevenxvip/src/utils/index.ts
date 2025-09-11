@@ -14,6 +14,7 @@ export type LinkItem = {
   createdAt: string;
   updatedAt: string;
   slug: string;
+  contentType?: string
   };
 
  export type ContentItem = {

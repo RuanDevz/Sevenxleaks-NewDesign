@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { AlertTriangle, Ban, Eye } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
@@ -45,6 +45,19 @@ const BannedContent: React.FC = () => {
     const jsonString = atob(fixedBase64);
     return JSON.parse(jsonString) as T;
   }
+
+    const getPath = (l: LinkItem) => {
+  const ct = l.contentType || "asian";
+  if (ct === "asian") {
+    if (l.category === "Banned") return `/banned/${l.slug}`;
+    if (l.category === "Unknown") return `/unknown/${l.slug}`;
+    return `/asian/${l.slug}`;
+  }
+  if (ct === "banned") return `/banned/${l.slug}`;
+  if (ct === "unknown") return `/unknown/${l.slug}`;
+  if (ct === "vip") return `/vip/${l.slug}`;
+  return `/western/${l.slug}`;
+};
 
   const fetchContent = async (page: number, isLoadMore = false) => {
     try {
@@ -293,7 +306,10 @@ const BannedContent: React.FC = () => {
                             return sortOption === "oldest" ? da - db : db - da;
                           })
                           .map((link, index) => (
-                            <motion.div
+                             <Link to={getPath(link)}
+                        className="relative block rounded-xl p-3 focus:outline-none"
+                        draggable={false}>
+                          <motion.div
                               key={link.id}
                               initial={{ opacity: 0, y: 20 }}
                               animate={{ opacity: 1, y: 0 }}
@@ -375,6 +391,7 @@ const BannedContent: React.FC = () => {
                                 </div>
                               </div>
                             </motion.div>
+                        </Link>
                           ))}
                       </div>
                     </div>
