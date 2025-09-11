@@ -126,12 +126,7 @@ app.use('/vip-unknowncontent', checkApiKey, VipUnknownRouter);
 app.use('/universal-search', checkApiKey, universalSearchRouter);
 
 // ===== Rate limit =====
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: 'Ip bloqueado.'
-});
-app.use(limiter);
+
 
 // ===== Bloqueio por user-agent =====
 app.use((req, res, next) => {
