@@ -244,5 +244,4 @@ app.use('*', (req, res) => {
 });
 
 // ===== Export =====
-// Na Vercel exporta somente o handler serverless; local exporta o app (útil para testes).
 module.exports = process.env.VERCEL ? serverless(app) : app;
