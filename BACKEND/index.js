@@ -178,4 +178,6 @@ db.sequelize.authenticate()
   .catch(err => {
     console.error('Erro ao conectar ao banco de dados Sequelize:', err);
   });
+
+  module.exports = app;
   
