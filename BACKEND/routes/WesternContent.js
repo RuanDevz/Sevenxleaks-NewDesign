@@ -176,6 +176,8 @@ router.get('/search', async (req, res) => {
 // ===== GET all =====
 router.get('/', async (req, res) => {
   try {
+    console.log('WesternContent GET / called with query:', req.query);
+    
     const page = parseInt(req.query.page) || 1;
     const limit = 900;
     const offset = (page - 1) * limit;
@@ -191,11 +193,14 @@ router.get('/', async (req, res) => {
       order: [['postDate', 'DESC']],
     });
 
+    console.log('WesternContent found:', westernContents.length, 'items');
+
     const payload = { page, perPage: limit, data: westernContents };
     const encodedPayload = encodePayloadToBase64(payload);
     res.status(200).json({ data: encodedPayload });
 
   } catch (error) {
+    console.error('Error in WesternContent GET /:', error);
     res.status(500).json({ error: 'Erro ao buscar conteúdos ocidentais: ' + error.message });
   }
 });

@@ -3,14 +3,34 @@ const cors = require('cors');
 const db = require('./models');
 require('dotenv').config();
 const { Pool } = require('pg');
+const serverless = require('serverless-http');
 
 const app = express();
 
 app.set('trust proxy', 1);
 
+// Configuração CORS mais permissiva para Vercel
 app.use(cors({
+  origin: function (origin, callback) {
+    // Permite requisições sem origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'https://sevenxleaks.com',
+      'http://localhost:5173',
+      'https://newdesign-livid.vercel.app'
+    ];
+    
+    // Permite qualquer subdomínio da Vercel
+    if (origin.includes('.vercel.app') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    callback(null, true); // Temporariamente permite todas as origens para debug
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
 
 app.use((req, res, next) => {
@@ -122,6 +142,37 @@ app.use((req, res, next) => {
   next();
 });
 
+// Headers de segurança para Vercel
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-api-key, x-admin-key');
+  
+// Health check para Vercel
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Root route
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    message: 'SevenxLeaks API is running',
+    version: '1.0.0',
+    status: 'active'
+  });
+});
+
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 app.use((req, res, next) => {
   const url = decodeURIComponent(req.originalUrl);
 
@@ -147,36 +198,108 @@ app.use((req, res, next) => {
 });
 
 
+// Configuração do pool de conexão para produção
+let pool;
+if (process.env.NODE_ENV === 'production' && process.env.POSTGRES_URL) {
+  pool = new Pool({
+    connectionString: process.env.POSTGRES_URL,
+    ssl: {
+      require: true,
+      rejectUnauthorized: false
+    },
+    max: 5,
+    min: 0,
+    idle: 10000,
+    acquire: 30000
+  });
+} else if (process.env.POSTGRES_URL) {
+  pool = new Pool({
+    connectionString: process.env.POSTGRES_URL,
+  });
+}
 
-const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL, 
-});
+if (pool) {
+  pool.connect((err, client, done) => {
+    if (err) {
+      console.error('Erro ao conectar ao banco de dados:', err);
+      return;
+    }
+    console.log('Conexão bem-sucedida ao banco de dados');
+    done();
+  });
+}
 
-pool.connect((err, client, done) => {
-  if (err) {
-    console.error('Erro ao conectar ao banco de dados:', err);
-    return;
+// Inicialização do banco apenas se não estiver na Vercel
+const initializeDatabase = async () => {
+  try {
+    await db.sequelize.authenticate();
+    console.log('Conexão com o banco de dados estabelecida com sucesso.');
+    
+    // Sync apenas em desenvolvimento
+    if (process.env.NODE_ENV !== 'production') {
+      await db.sequelize.sync({ alter: true });
+    }
+    
+    return true;
+  } catch (err) {
+    console.error('Erro ao conectar ao banco de dados Sequelize:', err);
+    return false;
   }
-  console.log('Conexão bem-sucedida ao banco de dados');
-  console.log('DB URL:', process.env.POSTGRES_URL);
-  done();
+};
+
+// Inicialização condicional para Vercel
+if (process.env.VERCEL) {
+  // Na Vercel, não inicializa servidor HTTP
+  initializeDatabase().then(() => {
+    console.log('Database initialized for Vercel');
+  });
+} else {
+  // Desenvolvimento local
+  initializeDatabase().then((success) => {
+    if (success) {
+      const PORT = process.env.PORT || 3001;
+      app.listen(PORT, () => {
+        console.log(`Servidor rodando na porta ${PORT}...`);
+      });
+    }
+  });
+}
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+  });
 });
 
-db.sequelize.sync({ alter: true });
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({ 
+    error: 'Route not found',
+    path: req.originalUrl,
+    method: req.method
+  });
+});
+
+// Para Vercel
+if (process.env.VERCEL) {
+  module.exports = serverless(app);
+} else {
+  const PORT = process.env.PORT || 3001;
+  app.listen(PORT, () => {
+    console.log(`Servidor rodando na porta ${PORT}...`);
+  });
+}
 
 db.sequelize.authenticate()
   .then(() => {
     console.log('Conexão com o banco de dados estabelecida com sucesso.');
-    return db.sequelize.sync();
-  })
-  .then(() => {
-    const PORT = process.env.PORT || 3001;
-    app.listen(PORT, () => {
-      console.log(`Servidor rodando na porta ${PORT}...`);
-    });
   })
   .catch(err => {
     console.error('Erro ao conectar ao banco de dados Sequelize:', err);
   });
+
 
   module.exports = app;

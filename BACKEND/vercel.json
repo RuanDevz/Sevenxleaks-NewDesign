@@ -8,8 +8,116 @@
   ],
   "routes": [
     {
+      "src": "/health",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/webhook/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/auth/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/asiancontent/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/westerncontent/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/bannedcontent/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/unknowncontent/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/vipcontent/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/vip-asiancontent/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/vip-westerncontent/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/vip-bannedcontent/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/vip-unknowncontent/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/universal-search/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/reactions/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/linkvertise-config/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/pay/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/forgot-password/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/reset-password/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/update-vip-status/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/admin/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/recommendations/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/cancel-subscription/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/filteroptions/(.*)",
+      "dest": "/index.js"
+    },
+    {
+      "src": "/stripe-portal/(.*)",
+      "dest": "/index.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.js"
     }
-  ]
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "functions": {
+    "index.js": {
+      "maxDuration": 30
+    }
+  }
 }

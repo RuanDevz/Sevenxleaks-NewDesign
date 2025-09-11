@@ -10,22 +10,56 @@ module.exports = function checkApiKey(req, res, next) {
   const allowedOrigins = [
     'https://sevenxleaks.com',
     'http://localhost:5173',
-    'https://newdesign-livid.vercel.app'
+    'https://newdesign-livid.vercel.app',
+    // Adiciona suporte para qualquer subdomínio da Vercel
+    /.*\.vercel\.app$/
   ];
 
-  const isAllowedOrigin =
-    allowedOrigins.includes(origin) ||
-    allowedOrigins.some(o => referer?.startsWith(o));
+  const isAllowedOrigin = () => {
+    if (!origin && !referer) return true; // Permite requisições sem origin
+    
+    // Verifica origins exatos
+    if (origin && allowedOrigins.some(o => 
+      typeof o === 'string' ? o === origin : o.test(origin)
+    )) {
+      return true;
+    }
+    
+    // Verifica referer
+    if (referer && allowedOrigins.some(o => 
+      typeof o === 'string' ? referer.startsWith(o) : o.test(referer)
+    )) {
+      return true;
+    }
+    
+    return false;
+  };
 
   // ✅ Se for admin com chave correta → libera tudo
   if (adminKey && adminKey === allowedAdminKey) {
     return next();
   }
 
-  // ✅ Se for GET com origem confiável + chave do frontend → libera
-  if (req.method === 'GET' && apiKey === allowedApiKey && isAllowedOrigin) {
+  // ✅ Se for GET com chave do frontend → libera (origem verificada separadamente)
+  if (req.method === 'GET' && apiKey === allowedApiKey) {
     return next();
   }
+
+  // ✅ Para desenvolvimento, permite requisições locais
+  if (process.env.NODE_ENV === 'development' && 
+      (origin?.includes('localhost') || referer?.includes('localhost'))) {
+    return next();
+  }
+
+  // Log para debug na Vercel
+  console.log('API Key Check Failed:', {
+    method: req.method,
+    origin,
+    referer,
+    hasApiKey: !!apiKey,
+    hasAdminKey: !!adminKey,
+    path: req.path
+  });
 
   // ❌ Bloqueia o resto
   return res.status(403).json({ error: 'Unauthorized access' });

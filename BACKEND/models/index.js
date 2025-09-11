@@ -18,19 +18,35 @@ const url = process.env.POSTGRES_URL || (cfg.use_env_variable ? process.env[cfg.
 if (url) {
   sequelize = new Sequelize(url, {
     dialect: 'postgres',
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
     // mescla opções do config.json se existirem
     ...(cfg.dialectOptions ? { dialectOptions: cfg.dialectOptions } : {}),
     ...(cfg.pool ? { pool: cfg.pool } : {}),
-    logging: false
+    // Configurações específicas para Vercel
+    ...(process.env.VERCEL ? {
+      dialectOptions: {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false
+        }
+      },
+      pool: {
+        max: 5,
+        min: 0,
+        idle: 10000,
+        acquire: 30000,
+        evict: 1000
+      }
+    } : {})
   });
 } else {
   sequelize = new Sequelize(cfg.database, cfg.username, cfg.password, {
     host: cfg.host,
     port: cfg.port,
     dialect: cfg.dialect || 'postgres',
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
     ...(cfg.dialectOptions ? { dialectOptions: cfg.dialectOptions } : {}),
     ...(cfg.pool ? { pool: cfg.pool } : {}),
-    logging: false
   });
 }
 
