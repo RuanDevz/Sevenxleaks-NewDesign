@@ -12,9 +12,9 @@ export interface CategoryOption {
 interface CategoryFilterProps {
   selected: string;
   onChange: (value: string) => void;
-  options: CategoryOption[]; // inclua "" | All Categories
+  options: CategoryOption[]; 
   themeColor?: "purple" | "orange" | "yellow" | "red" | "slate";
-  placeholder?: string; // default: "All Categories"
+  placeholder?: string; 
 }
 
 const CategoryFilter: React.FC<CategoryFilterProps> = ({

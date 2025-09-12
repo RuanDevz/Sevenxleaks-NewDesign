@@ -64,17 +64,20 @@ const VIPUnknownPage: React.FC = () => {
     return JSON.parse(jsonString) as T;
   }
 
-          const getPath = (l: LinkItem) => {
-  const ct = l.contentType || "asian";
-  if (ct === "asian") {
-    if (l.category === "Banned") return `/banned/${l.slug}`;
-    if (l.category === "Unknown") return `/unknown/${l.slug}`;
-    return `/asian/${l.slug}`;
+  const getVipPath = (l: LinkItem): string => {
+  const ct = (l.contentType ?? "vip-asian").toLowerCase();
+  const cat = (l.category ?? "").toLowerCase();
+
+  if (ct === "vip-asian" || ct === "asian") {
+    if (cat === "vip-banned") return `/vip-banned/${l.slug}`;
+    if (cat === "vip-unknown") return `/vip-unknown/${l.slug}`;
+    return `/vip-asian/${l.slug}`;
   }
-  if (ct === "banned") return `/banned/${l.slug}`;
-  if (ct === "unknown") return `/unknown/${l.slug}`;
+  if (ct === "vip-western" || ct === "western") return `/vip-western/${l.slug}`;
+  if (ct === "vip-banned" || ct === "banned") return `/vip-banned/${l.slug}`;
+  if (ct === "vip-unknown" || ct === "unknown") return `/vip-unknown/${l.slug}`;
   if (ct === "vip") return `/vip/${l.slug}`;
-  return `/western/${l.slug}`;
+  return `/vip-asian/${l.slug}`;
 };
 
   const fetchContent = async (page: number, isLoadMore = false) => {
@@ -330,11 +333,11 @@ const VIPUnknownPage: React.FC = () => {
                           return sortOption === "oldest" ? at - bt : bt - at;
                         })
                         .map((link, index) => (
-                           <Link to={getPath(link)}
+                           <Link to={getVipPath(link)}
                         className="relative block rounded-xl p-3 focus:outline-none"
                         draggable={false}>
                           <motion.div
-                            key={link.id}
+                            key={link.slug}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.05 }}

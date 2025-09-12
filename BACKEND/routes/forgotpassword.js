@@ -4,13 +4,16 @@ const crypto = require("crypto");
 const { User } = require("../models");
 const router = express.Router();
 
-const transporter = nodemailer.createTransport({
-  service: "gmail",
+let transporter = nodemailer.createTransport({
+  host: process.env.HOST,
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
 });
+
 
 router.post("/", async (req, res) => {
   const { email } = req.body;
@@ -29,13 +32,26 @@ router.post("/", async (req, res) => {
     await user.save();
 
     const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: "Password Reset Request",
-      html: `<p>You requested a password reset. Click the link below to reset your password:</p>
-             <a href="${resetLink}">Reset Password</a>`,
-    };
+   const mailOptions = {
+  from: process.env.EMAIL_USER,
+  to: email,
+  subject: "Password Reset Request",
+  html: `
+    <div style="font-family: Arial, sans-serif; background-color: #4B0082; color: #FFFFFF; padding: 20px; border-radius: 8px; text-align: center;">
+      <h2 style="margin-bottom: 20px;">Password Reset Request</h2>
+      <p style="margin-bottom: 20px;">
+        You requested a password reset. Click the button below to reset your password:
+      </p>
+      <a href="${resetLink}" style="display: inline-block; padding: 12px 24px; background-color: #FFFFFF; color: #4B0082; font-weight: bold; text-decoration: none; border-radius: 6px;">
+        Reset Password
+      </a>
+      <p style="margin-top: 20px; font-size: 12px; color: #DDD;">
+        If you did not request this, please ignore this message.
+      </p>
+    </div>
+  `,
+};
+
 
     await transporter.sendMail(mailOptions);
 
