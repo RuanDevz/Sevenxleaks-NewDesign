@@ -48,11 +48,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         defaultValue: [], 
       },
-      transactions: { 
-        type: DataTypes.JSONB, 
-        allowNull: true,
-        defaultValue: [], 
-      },
       favorites: { 
         type: DataTypes.JSONB, 
         allowNull: true,
