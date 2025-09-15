@@ -11,7 +11,6 @@ module.exports = function checkApiKey(req, res, next) {
     'https://sevenxleaks.com',
     'http://localhost:5173',
     'https://newdesign-livid.vercel.app',
-    // Adiciona suporte para qualquer subdomínio da Vercel
     /.*\.vercel\.app$/
   ];
 
