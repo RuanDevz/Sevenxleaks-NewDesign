@@ -48,11 +48,6 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         defaultValue: [], 
       },
-      favorites: { 
-        type: DataTypes.JSONB, 
-        allowNull: true,
-        defaultValue: [], 
-      },
       stripeSubscriptionId: { 
         type: DataTypes.STRING, 
         allowNull: true,

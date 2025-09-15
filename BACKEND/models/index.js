@@ -2,66 +2,80 @@
 
 const fs = require('fs');
 const path = require('path');
-const Sequelize = require('sequelize');
+const { Sequelize, DataTypes } = require('sequelize');
 const process = require('process');
+
 const basename = path.basename(__filename);
 const env = process.env.NODE_ENV || 'development';
-const allConfigs = require(__dirname + '/../config/config.json');
+const allConfigs = require(path.join(__dirname, '..', 'config', 'config.json'));
 const cfg = allConfigs[env] || {};
 const db = {};
 
+// Fonte única do DSN
+const URL = process.env.POSTGRES_URL || (cfg.use_env_variable ? process.env[cfg.use_env_variable] : null);
+
+// Detecta necessidade de SSL
+const sslFromUrl = /sslmode=require/i.test(URL || '');
+const sslFlag = (process.env.PGSSL || '').toLowerCase() === 'true';
+const mustSSL = sslFromUrl || sslFlag;
+
+// Pool padrão seguro para prod/serverless moderado
+const defaultPool = {
+  max: Number(process.env.DB_POOL_MAX || 5),
+  min: 0,
+  idle: 10_000,
+  acquire: 60_000,
+  evict: 10_000
+};
+
+// Opções comuns
+const baseOptions = {
+  dialect: 'postgres',
+  logging: process.env.NODE_ENV === 'development' && process.env.SQL_LOG === 'true' ? console.log : false,
+  pool: cfg.pool || defaultPool,
+  dialectOptions: {
+    ...(cfg.dialectOptions || {}),
+    ...(mustSSL ? { ssl: { require: true, rejectUnauthorized: false } } : {})
+  }
+};
+
 let sequelize;
 
-// prioriza POSTGRES_URL; se ausente, usa config.json
-const url = process.env.POSTGRES_URL || (cfg.use_env_variable ? process.env[cfg.use_env_variable] : null);
-
-if (url) {
-  sequelize = new Sequelize(url, {
-    dialect: 'postgres',
-    logging: process.env.NODE_ENV === 'development' ? console.log : false,
-    // mescla opções do config.json se existirem
-    ...(cfg.dialectOptions ? { dialectOptions: cfg.dialectOptions } : {}),
-    ...(cfg.pool ? { pool: cfg.pool } : {}),
-    // Configurações específicas para Vercel
-    ...(process.env.VERCEL ? {
-      dialectOptions: {
-        ssl: {
-          require: true,
-          rejectUnauthorized: false
-        }
-      },
-      pool: {
-        max: 5,
-        min: 0,
-        idle: 10000,
-        acquire: 30000,
-        evict: 1000
-      }
-    } : {})
-  });
+if (URL) {
+  sequelize = new Sequelize(URL, baseOptions);
 } else {
-  sequelize = new Sequelize(cfg.database, cfg.username, cfg.password, {
-    host: cfg.host,
-    port: cfg.port,
-    dialect: cfg.dialect || 'postgres',
-    logging: process.env.NODE_ENV === 'development' ? console.log : false,
-    ...(cfg.dialectOptions ? { dialectOptions: cfg.dialectOptions } : {}),
-    ...(cfg.pool ? { pool: cfg.pool } : {}),
-  });
+  // Fallback ao config.json apenas se o DSN não existir
+  sequelize = new Sequelize(
+    cfg.database,
+    cfg.username,
+    cfg.password,
+    {
+      host: cfg.host,
+      port: cfg.port,
+      ...baseOptions
+    }
+  );
 }
 
-fs
-  .readdirSync(__dirname)
-  .filter(file => file.indexOf('.') !== 0 && file !== basename && file.endsWith('.js') && !file.endsWith('.test.js'))
+// Carrega modelos
+fs.readdirSync(__dirname)
+  .filter(file =>
+    file.indexOf('.') !== 0 &&
+    file !== basename &&
+    file.endsWith('.js') &&
+    !file.endsWith('.test.js')
+  )
   .forEach(file => {
-    const model = require(path.join(__dirname, file))(sequelize, Sequelize.DataTypes);
+    const model = require(path.join(__dirname, file))(sequelize, DataTypes);
     db[model.name] = model;
   });
 
-Object.keys(db).forEach(modelName => {
-  if (db[modelName].associate) db[modelName].associate(db);
+// Associações
+Object.keys(db).forEach(name => {
+  if (typeof db[name].associate === 'function') db[name].associate(db);
 });
 
+// Exporta
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 
