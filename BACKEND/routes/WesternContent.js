@@ -189,7 +189,7 @@ router.get('/', async (req, res) => {
       where,
       limit,
       offset,
-      order: [['id', 'DESC']], // Usa ID ao invés de postDate
+      order: [['postDate', 'DESC']], // Usa ID ao invés de postDate
       raw: true,
       timeout: 8000,
       logging: false

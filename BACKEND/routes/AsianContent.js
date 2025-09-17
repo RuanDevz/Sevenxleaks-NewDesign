@@ -198,9 +198,9 @@ router.get('/', async (req, res) => {
       where,
       limit,
       offset,
-      order: [['id', 'DESC']], // Usa ID ao invés de postDate para melhor performance
+      order: [['postDate', 'DESC']], // Usa ID ao invés de postDate para melhor performance
       raw: true,
-      timeout: 8000, // 8 segundos
+      timeout: 15000, 
       logging: false
     });
 
