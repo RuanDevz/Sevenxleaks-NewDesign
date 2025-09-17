@@ -3,6 +3,7 @@ const cors = require('cors');
 const db = require('./models');
 require('dotenv').config();
 const { Pool } = require('pg');
+const { ensureConnection } = require('./utils/dbHealthCheck');
 
 const app = express();
 
@@ -70,7 +71,10 @@ const VipBannedRouter = require('./routes/VipBannedContent');
 const VipUnknownRouter = require('./routes/VipUnknownContent');
 const universalSearchRouter = require('./routes/UniversalSearch');
 
-
+// Aplicar health check em rotas críticas
+app.use('/universal-search', ensureConnection);
+app.use('/asiancontent', ensureConnection);
+app.use('/westerncontent', ensureConnection);
 
 app.use('/auth', userRouter);
 
@@ -176,19 +180,29 @@ const testConnection = async () => {
 // Configuração mais robusta do Sequelize
 const initializeDatabase = async () => {
   try {
-    // Teste de autenticação
-    await db.sequelize.authenticate();
+    // Teste de autenticação com timeout
+    await Promise.race([
+      db.sequelize.authenticate(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout na autenticação')), 10000)
+      )
+    ]);
     console.log('Conexão Sequelize estabelecida com sucesso.');
     
-    // Sync apenas em desenvolvimento
+    // Sync apenas em desenvolvimento e com timeout
     if (process.env.NODE_ENV === 'development') {
-      await db.sequelize.sync({ alter: true });
+      await Promise.race([
+        db.sequelize.sync({ alter: true }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout no sync')), 15000)
+        )
+      ]);
       console.log('Database sync completed.');
     }
     
     return true;
   } catch (error) {
-    console.error('Erro na inicialização do banco:', error);
+    console.error('Erro na inicialização do banco:', error.message);
     return false;
   }
 };

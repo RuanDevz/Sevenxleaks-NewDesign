@@ -176,8 +176,6 @@ router.get('/search', async (req, res) => {
 // ===== GET all =====
 router.get('/', async (req, res) => {
   try {
-    console.log('WesternContent GET / called with query:', req.query);
-    
     const page = parseInt(req.query.page) || 1;
     const limit = 900;
     const offset = (page - 1) * limit;
@@ -186,34 +184,29 @@ router.get('/', async (req, res) => {
     const where = {};
     if (region) where.region = region;
 
-    // Adicionar timeout e retry para queries
-    const westernContents = await Promise.race([
-      WesternContent.findAll({
-        where,
-        limit,
-        offset,
-        order: [['postDate', 'DESC']],
-        timeout: 30000,
-        retry: {
-          max: 2,
-          match: [/ConnectionError/, /TimeoutError/, /ConnectionAcquireTimeoutError/]
-        }
-      }),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Query timeout')), 30000)
-      )
-    ]);
-
-    console.log('WesternContent found:', westernContents.length, 'items');
+    // Query mais simples e rápida
+    const westernContents = await WesternContent.findAll({
+      where,
+      limit: Math.min(limit, 50), // Limita para evitar queries pesadas
+      offset,
+      order: [['id', 'DESC']], // Usa ID ao invés de postDate
+      raw: true,
+      timeout: 8000,
+      logging: false
+    });
 
     const payload = { page, perPage: limit, data: westernContents };
     const encodedPayload = encodePayloadToBase64(payload);
     res.status(200).json({ data: encodedPayload });
 
   } catch (error) {
-    console.error('Error in WesternContent GET /:', error);
-    // Retorna resposta vazia em caso de erro
-    const emptyPayload = { page: parseInt(req.query.page) || 1, perPage: 900, data: [] };
+    console.error('Erro em WesternContent:', error.message);
+    const emptyPayload = { 
+      page: parseInt(req.query.page) || 1, 
+      perPage: 900, 
+      data: [],
+      error: 'Timeout na consulta'
+    };
     const encodedPayload = encodePayloadToBase64(payload);
     res.status(200).json({ data: encodedPayload });
   }

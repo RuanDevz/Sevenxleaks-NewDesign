@@ -22,21 +22,24 @@
         "require": true, 
         "rejectUnauthorized": false 
       },
-      "connectTimeout": 60000,
-      "socketTimeout": 60000,
+      "connectTimeout": 15000,
+      "socketTimeout": 15000,
       "keepAlive": true,
-      "keepAliveInitialDelayMillis": 0
+      "keepAliveInitialDelayMillis": 0,
+      "statement_timeout": 10000,
+      "query_timeout": 10000,
+      "idle_in_transaction_session_timeout": 8000
     },
     "pool": { 
-      "max": 3, 
+      "max": 1, 
       "min": 0, 
-      "idle": 5000, 
-      "acquire": 60000,
+      "idle": 2000, 
+      "acquire": 10000,
       "evict": 1000,
       "handleDisconnects": true
     },
     "retry": {
-      "max": 3
+      "max": 2
     }
   }
 }

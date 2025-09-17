@@ -12,33 +12,36 @@ const db = {};
 
 let sequelize;
 
-// prioriza POSTGRES_URL; se ausente, usa config.json
+// Prioriza POSTGRES_URL; se ausente, usa config.json
 const url = process.env.POSTGRES_URL || (cfg.use_env_variable ? process.env[cfg.use_env_variable] : null);
 
 if (url) {
   sequelize = new Sequelize(url, {
     dialect: 'postgres',
-    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    logging: false, // Desabilita logs para reduzir overhead
     dialectOptions: {
       ssl: {
         require: true,
         rejectUnauthorized: false
       },
-      // Configurações de timeout para conexão
-      connectTimeout: 60000,
-      socketTimeout: 60000,
+      // Configurações agressivas de timeout
+      connectTimeout: 20000,
+      socketTimeout: 20000,
       keepAlive: true,
       keepAliveInitialDelayMillis: 0,
+      statement_timeout: 15000, // 15 segundos para statements
+      query_timeout: 15000,
+      idle_in_transaction_session_timeout: 10000
     },
     pool: {
-      max: 3, // Reduzido para evitar sobrecarga
+      max: 1, // Apenas 1 conexão para evitar concorrência
       min: 0,
-      idle: 5000, // Reduzido
-      acquire: 60000, // Aumentado para 60 segundos
+      idle: 3000, // Reduzido drasticamente
+      acquire: 15000, // Reduzido para 15 segundos
       evict: 1000,
       handleDisconnects: true,
       validate: (client) => {
-        return !client.connection._ending;
+        return client && !client.connection._ending && !client.connection.destroyed;
       }
     },
     retry: {
@@ -55,13 +58,22 @@ if (url) {
         /SequelizeConnectionTimedOutError/,
         /ConnectionAcquireTimeoutError/
       ],
-      max: 3
+      max: 2 // Reduzido para 2 tentativas
     },
-    // Configurações adicionais para produção
+    // Configurações para reduzir overhead
     define: {
       freezeTableName: true,
       timestamps: true,
       underscored: false
+    },
+    // Configurações específicas para serverless
+    hooks: {
+      beforeConnect: async (config) => {
+        console.log('Tentando conectar ao banco...');
+      },
+      afterConnect: async (connection, config) => {
+        console.log('Conexão estabelecida com sucesso');
+      }
     }
   });
 } else {
@@ -72,10 +84,10 @@ if (url) {
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     dialectOptions: cfg.dialectOptions || {},
     pool: cfg.pool || {
-      max: 3,
+      max: 1,
       min: 0,
-      idle: 5000,
-      acquire: 60000,
+      idle: 3000,
+      acquire: 15000,
       evict: 1000
     }
   });
