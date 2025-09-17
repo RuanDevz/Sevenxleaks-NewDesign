@@ -40,7 +40,6 @@ app.use((req, res, next) => {
   }
 });
 
-const reactionsRouter = require('./routes/Reactions');
 
 
 const linkvertiseConfigRouter = require('./routes/linkvertiseConfig');
@@ -81,8 +80,6 @@ app.use('/auth', userRouter);
 
 app.use('/cancel-subscription', cancelsubscriptionRouter);
 
-app.use('/reactions', reactionsRouter);
-
 app.use('/auth', authRoutes);
 app.use('/vipcontent', checkApiKey, VipRouter);
 app.use('/pay', payRouter);
@@ -91,7 +88,6 @@ app.use('/reset-password', ResetPasswordRouter);
 app.use('/update-vip-status', checkApiKey, UpdateVipStatus);
 app.use('/api/stats', checkApiKey, StatsRouter);  
 app.use('/admin/requests', checkApiKey, RequestsRouter);
-app.use('/recommendations', recommendationsRouter);
 app.use('/webhook', stripeWebhookRouter);
 app.use('/auth', renewVipRouter);
 app.use('/filteroptions', filterOptionsRoutes);
@@ -189,21 +185,27 @@ const initializeDatabase = async () => {
     ]);
     console.log('Conexão Sequelize estabelecida com sucesso.');
     
-    // Sync apenas em desenvolvimento e com timeout
-    if (process.env.NODE_ENV === 'development') {
-      await Promise.race([
-        db.sequelize.sync({ alter: true }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout no sync')), 15000)
-        )
-      ]);
-      console.log('Database sync completed.');
+    // Criar tabelas se não existirem (tanto dev quanto prod)
+    const tablesCreated = await Promise.race([
+      db.createTablesIfNotExist(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout na criação de tabelas')), 30000)
+      )
+    ]);
+    
+    if (tablesCreated) {
+      console.log('✅ Database initialization completed.');
+    } else {
+      console.warn('⚠️ Algumas tabelas podem não ter sido criadas corretamente.');
     }
     
     return true;
   } catch (error) {
     console.error('Erro na inicialização do banco:', error.message);
-    return false;
+    
+    // Tenta continuar mesmo com erro de sync
+    console.log('⚠️ Continuando sem sync completo...');
+    return true;
   }
 };
 

@@ -1,5 +1,11 @@
 module.exports = (sequelize, DataTypes) => {
     const User = sequelize.define('User', {
+      id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true,
+        allowNull: false,
+      },
       name: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -57,7 +63,22 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         defaultValue: false,
       },
-    }, {});
+    }, {
+      tableName: 'Users',
+      timestamps: true,
+      indexes: [
+        {
+          unique: true,
+          fields: ['email']
+        },
+        {
+          fields: ['isVip']
+        },
+        {
+          fields: ['isAdmin']
+        }
+      ]
+    });
   
     return User;
   };

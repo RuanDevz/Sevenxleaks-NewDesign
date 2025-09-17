@@ -2,6 +2,12 @@
 
 module.exports = (sequelize, DataTypes) => {
   const Stats = sequelize.define("Stats", {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+      allowNull: false,
+    },
     totalUsers: {
       type: DataTypes.INTEGER,
       defaultValue: 0, 
@@ -14,6 +20,9 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       defaultValue: 0, 
     },
+  }, {
+    tableName: 'Stats',
+    timestamps: true
   });
 
   return Stats;

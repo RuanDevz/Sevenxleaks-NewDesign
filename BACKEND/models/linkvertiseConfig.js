@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
       comment: 'ID da conta ativa do Linkvertise'
     }
   }, {
-    tableName: 'linkvertise_configs',
+    tableName: 'LinkvertiseConfigs',
     timestamps: true,
     indexes: [
       {

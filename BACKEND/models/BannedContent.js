@@ -1,5 +1,11 @@
 module.exports = (sequelize, DataTypes) => {
   const BannedContent = sequelize.define("BannedContent", {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+      allowNull: false,
+    },
     name: {
       type: DataTypes.STRING,
       allowNull: false,
@@ -39,6 +45,7 @@ module.exports = (sequelize, DataTypes) => {
     slug:{
       type: DataTypes.STRING,
       allowNull: true,
+      unique: true,
     },
     category: {
       type: DataTypes.STRING,
@@ -49,6 +56,21 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: DataTypes.NOW,
     },
+  }, {
+    tableName: 'BannedContents',
+    timestamps: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ['slug']
+      },
+      {
+        fields: ['category']
+      },
+      {
+        fields: ['postDate']
+      }
+    ]
   });
 
   return BannedContent;
