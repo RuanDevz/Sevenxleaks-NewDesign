@@ -258,7 +258,7 @@ router.get('/search', async (req, res) => {
         const fallbackResults = await AsianContent.findAll({
           where: {},
           order: [['id', 'DESC']],
-          limit: 20,
+          limit: 200,
           raw: true,
           timeout: 5000,
           logging: false
