@@ -191,7 +191,7 @@ router.get('/', async (req, res) => {
       offset,
       order: [['postDate', 'DESC']], // Usa ID ao invés de postDate
       raw: true,
-      timeout: 8000,
+      timeout: 15000,
       logging: false
     });
 
