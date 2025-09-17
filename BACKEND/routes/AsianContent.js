@@ -198,7 +198,7 @@ router.get('/', async (req, res) => {
     // Query mais simples e rápida
     const asianContents = await AsianContent.findAll({
       where,
-      limit: Math.min(limit, 50), // Limita para evitar queries pesadas
+      limit: Math.min(limit, 900), // Limita para evitar queries pesadas
       offset,
       order: [['id', 'DESC']], // Usa ID ao invés de postDate para melhor performance
       raw: true,

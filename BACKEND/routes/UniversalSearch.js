@@ -107,7 +107,7 @@ async function safeModelSearch(model, modelName, whereClause, sortBy, sortOrder)
         const simpleResult = await model.findAll({
           where: { name: { [Op.ne]: null } }, // Query mais simples
           order: [['id', 'DESC']],
-          limit: 50,
+          limit: 900,
           raw: true,
           timeout: 5000,
           logging: false
