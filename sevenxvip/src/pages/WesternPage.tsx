@@ -66,7 +66,6 @@ const WesternPage: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [dateFilter, setDateFilter] = useState("all");
-  const [allLoaded, setAllLoaded] = useState(false);
 
   function decodeModifiedBase64<T>(encodedStr: string): T {
     const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
@@ -84,7 +83,7 @@ const WesternPage: React.FC = () => {
         page: page.toString(),
         sortBy: "postDate",
         sortOrder: "DESC",
-        limit: "900"
+        limit: "300"
       });
 
       if (searchName) params.append('search', searchName);
@@ -127,7 +126,6 @@ const WesternPage: React.FC = () => {
       setTotalPages(totalPages);
       const hasMore = page < totalPages && rawData.length > 0;
       setHasMoreContent(hasMore);
-      setAllLoaded(!hasMore);
 
       const uniqueCategories = Array.from(
         new Set(rawData.map((item) => item.category))
@@ -149,36 +147,13 @@ const WesternPage: React.FC = () => {
     } finally {
       setLoading(false);
       setLoadingMore(false);
-      setLoadingMore(false);
       setSearchLoading(false);
     }
   };
 
-  // Infinite scroll handler
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = document.documentElement.scrollTop;
-      const scrollHeight = document.documentElement.scrollHeight;
-      const clientHeight = document.documentElement.clientHeight;
-      
-      if (
-        scrollTop + clientHeight >= scrollHeight - 1000 &&
-        hasMoreContent &&
-        !loadingMore &&
-        !loading &&
-        !allLoaded
-      ) {
-        handleLoadMore();
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasMoreContent, loadingMore, loading, allLoaded]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setAllLoaded(false);
       setHasMoreContent(true);
       fetchContent(1);
     }, 300);
@@ -187,7 +162,7 @@ const WesternPage: React.FC = () => {
   }, [searchName, selectedCategory, selectedMonth, dateFilter]);
 
   const handleLoadMore = () => {
-    if (loadingMore || !hasMoreContent || currentPage >= totalPages || allLoaded) return;
+    if (loadingMore || !hasMoreContent || currentPage >= totalPages) return;
     const nextPage = currentPage + 1;
     setCurrentPage(nextPage);
     fetchContent(nextPage, true);
@@ -426,16 +401,28 @@ const WesternPage: React.FC = () => {
 
               {hasMoreContent && (
                 <div className="text-center mt-12 py-8">
-                  {loadingMore && (
-                    <div className="flex items-center justify-center">
-                      <div className={`w-8 h-8 border-4 border-t-transparent rounded-full animate-spin ${
-                        isDark ? 'border-orange-500' : 'border-orange-600'
-                      }`}></div>
-                      <span className={`ml-3 text-lg font-medium ${
-                        isDark ? 'text-orange-400' : 'text-orange-600'
-                      }`}>Loading more content...</span>
-                    </div>
-                  )}
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className={`px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 ${
+                      loadingMore
+                        ? 'bg-gray-600 cursor-not-allowed'
+                        : isDark
+                          ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg hover:shadow-orange-500/30'
+                          : 'bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 shadow-lg hover:shadow-orange-500/20'
+                    } text-white`}
+                  >
+                    {loadingMore ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block mr-2" />
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More Content'
+                    )}
+                  </motion.button>
                 </div>
               )}
             </>

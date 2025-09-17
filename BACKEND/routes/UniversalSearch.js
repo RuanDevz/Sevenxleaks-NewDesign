@@ -74,54 +74,23 @@ function createDateFilter(dateFilter, month) {
 }
 
 // Função para buscar com timeout e fallback
-async function safeModelSearch(model, modelName, whereClause, sortBy, sortOrder, limit, offset) {
-  const timeoutMs = 10000; // 10 segundos por query
-  
+async function safeModelSearch(model, modelName, whereClause, sortBy, sortOrder, limit, offset) {  
   try {
     console.log(`Iniciando busca em ${modelName}...`);
     
-    const result = await Promise.race([
-      model.findAll({
-        where: whereClause,
-        order: [[sortBy, sortOrder]],
-        limit,
-        offset,
-        raw: true,
-        timeout: timeoutMs,
-        logging: false
-      }),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error(`Timeout de ${timeoutMs}ms para ${modelName}`)), timeoutMs)
-      )
-    ]);
+    const result = await model.findAll({
+      where: whereClause,
+      order: [[sortBy, sortOrder]],
+      limit,
+      offset,
+      raw: true
+    });
     
     console.log(`Busca em ${modelName} concluída: ${result.length} itens`);
     return result;
     
   } catch (error) {
     console.error(`Erro ao buscar em ${modelName}:`, error.message);
-    
-    // Se der timeout, tenta uma query mais simples
-    if (error.message.includes('timeout') || error.message.includes('Timeout')) {
-      try {
-        console.log(`Tentando busca simplificada em ${modelName}...`);
-        const simpleResult = await model.findAll({
-          where: { name: { [Op.ne]: null } }, // Query mais simples
-          order: [['id', 'DESC']],
-          limit,
-          offset,
-          raw: true,
-          timeout: 5000,
-          logging: false
-        });
-        console.log(`Busca simplificada em ${modelName} concluída: ${simpleResult.length} itens`);
-        return simpleResult;
-      } catch (fallbackError) {
-        console.error(`Fallback também falhou para ${modelName}:`, fallbackError.message);
-        return [];
-      }
-    }
-    
     return [];
   }
 }
@@ -132,7 +101,7 @@ router.get('/search', async (req, res) => {
   
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || 150, 150);
+    const limit = parseInt(req.query.limit) || 300;
     const offset = (page - 1) * limit;
 
     const { 
@@ -221,21 +190,15 @@ router.get('/search', async (req, res) => {
       });
     }
 
-    // Executar buscas com timeout global mais agressivo
+    // Executar buscas
     let allResults = [];
-    const globalTimeout = 20000; // 20 segundos total
     
     try {
       const searchPromises = searchTasks.map(({ name, task }) => 
         task().then(results => ({ name, results: results.map(item => ({ ...item, contentType: name })) }))
       );
 
-      const searchResults = await Promise.race([
-        Promise.allSettled(searchPromises),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout global da busca')), globalTimeout)
-        )
-      ]);
+      const searchResults = await Promise.allSettled(searchPromises);
 
       // Processar resultados
       searchResults.forEach((result) => {
@@ -246,30 +209,8 @@ router.get('/search', async (req, res) => {
         }
       });
 
-    } catch (globalError) {
-      console.error('Timeout global atingido:', globalError.message);
-      
-      // Fallback: retorna apenas dados em cache ou dados mínimos
-      allResults = [];
-    }
-
-    // Se não conseguiu nenhum resultado, tenta uma busca mais simples
-    if (allResults.length === 0 && !search) {
-      console.log('Tentando busca de fallback...');
-      try {
-        const fallbackResults = await AsianContent.findAll({
-          where: {},
-          order: [['id', 'DESC']],
-          limit: 200,
-          raw: true,
-          timeout: 5000,
-          logging: false
-        });
-        allResults = fallbackResults.map(item => ({ ...item, contentType: 'asian' }));
-        console.log(`Fallback retornou ${allResults.length} itens`);
-      } catch (fallbackError) {
-        console.error('Fallback também falhou:', fallbackError.message);
-      }
+    } catch (error) {
+      console.error('Erro nas buscas:', error.message);
     }
 
     // Ordenar resultados

@@ -39,7 +39,6 @@ const BannedContent: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const [allLoaded, setAllLoaded] = useState(false);
 
   function decodeModifiedBase64<T>(encodedStr: string): T {
     const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
@@ -70,7 +69,7 @@ const BannedContent: React.FC = () => {
         page: page.toString(),
         sortBy: "postDate",
         sortOrder: sortOption === "oldest" ? "ASC" : "DESC",
-        limit: "150",
+        limit: "300",
         category: "Banned"
       });
 
@@ -110,42 +109,18 @@ const BannedContent: React.FC = () => {
       setTotalPages(totalPages);
       const hasMore = page < totalPages && rawData.length > 0;
       setHasMoreContent(hasMore);
-      setAllLoaded(!hasMore);
     } catch (error) {
       console.error("Error fetching banned content:", error);
     } finally {
       setLoading(false);
       setLoadingMore(false);
-      setLoadingMore(false);
       setSearchLoading(false);
     }
   };
 
-  // Infinite scroll handler
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = document.documentElement.scrollTop;
-      const scrollHeight = document.documentElement.scrollHeight;
-      const clientHeight = document.documentElement.clientHeight;
-      
-      if (
-        scrollTop + clientHeight >= scrollHeight - 1000 &&
-        hasMoreContent &&
-        !loadingMore &&
-        !loading &&
-        !allLoaded
-      ) {
-        handleLoadMore();
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasMoreContent, loadingMore, loading, allLoaded]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setAllLoaded(false);
       setHasMoreContent(true);
       fetchContent(1);
     }, 300);
@@ -154,7 +129,7 @@ const BannedContent: React.FC = () => {
   }, [searchName, selectedMonth, sortOption]);
 
   const handleLoadMore = () => {
-    if (loadingMore || !hasMoreContent || currentPage >= totalPages || allLoaded) return;
+    if (loadingMore || !hasMoreContent || currentPage >= totalPages) return;
     const nextPage = currentPage + 1;
     setCurrentPage(nextPage);
     fetchContent(nextPage, true);
@@ -427,16 +402,28 @@ const BannedContent: React.FC = () => {
 
                 {hasMoreContent && (
                   <div className="text-center mt-12 py-8">
-                    {loadingMore && (
-                      <div className="flex items-center justify-center">
-                        <div className={`w-8 h-8 border-4 border-t-transparent rounded-full animate-spin ${
-                          isDark ? 'border-red-500' : 'border-red-600'
-                        }`}></div>
-                        <span className={`ml-3 text-lg font-medium ${
-                          isDark ? 'text-red-400' : 'text-red-600'
-                        }`}>Loading more content...</span>
-                      </div>
-                    )}
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleLoadMore}
+                      disabled={loadingMore}
+                      className={`px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 ${
+                        loadingMore
+                          ? 'bg-gray-600 cursor-not-allowed'
+                          : isDark
+                            ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 shadow-lg hover:shadow-red-500/30'
+                            : 'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg hover:shadow-red-500/20'
+                      } text-white`}
+                    >
+                      {loadingMore ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block mr-2" />
+                          Loading...
+                        </>
+                      ) : (
+                        'Load More Content'
+                      )}
+                    </motion.button>
                   </div>
                 )}
               </>

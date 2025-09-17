@@ -177,22 +177,19 @@ router.get('/search', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = Math.min(parseInt(req.query.limit) || 150, 150);
+    const limit = parseInt(req.query.limit) || 300;
     const offset = (page - 1) * limit;
     const { region } = req.query;
 
     const where = {};
     if (region) where.region = region;
 
-    // Query mais simples e rápida
     const westernContents = await WesternContent.findAll({
       where,
       limit,
       offset,
-      order: [['postDate', 'DESC']], // Usa ID ao invés de postDate
-      raw: true,
-      timeout: 15000,
-      logging: false
+      order: [['postDate', 'DESC']],
+      raw: true
     });
 
     const totalCount = await WesternContent.count({ where });
@@ -208,16 +205,7 @@ router.get('/', async (req, res) => {
 
   } catch (error) {
     console.error('Erro em WesternContent:', error.message);
-    const emptyPayload = { 
-      page: parseInt(req.query.page) || 1, 
-      perPage: Math.min(parseInt(req.query.limit) || 150, 150),
-      total: 0,
-      totalPages: 0,
-      data: [],
-      error: 'Timeout na consulta'
-    };
-    const encodedPayload = encodePayloadToBase64(emptyPayload);
-    res.status(200).json({ data: encodedPayload });
+    res.status(500).json({ error: 'Erro ao buscar conteúdos ocidentais: ' + error.message });
   }
 });
 

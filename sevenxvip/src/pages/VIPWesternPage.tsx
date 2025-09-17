@@ -54,7 +54,6 @@ const VIPWesternPage: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "7days">("all");
-  const [allLoaded, setAllLoaded] = useState(false);
 
   function decodeModifiedBase64<T>(encodedStr: string): T {
     const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
@@ -105,7 +104,7 @@ const VIPWesternPage: React.FC = () => {
       page: page.toString(),
       sortBy: "postDate",
       sortOrder: "DESC",
-      limit: "150",
+      limit: "300",
     });
 
     // instruções de data para o backend, se suportadas
@@ -148,23 +147,6 @@ const VIPWesternPage: React.FC = () => {
     return decoded;
   }
 
-  // Infinite scroll handler
-  useEffect(() => {
-    const handleScroll = () => {
-      if (
-        window.innerHeight + document.documentElement.scrollTop >=
-        document.documentElement.offsetHeight - 1000 &&
-        hasMoreContent &&
-        !loadingMore &&
-        !loading
-      ) {
-        handleLoadMore();
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasMoreContent, loadingMore, loading]);
   // coleta progressiva: varre páginas até achar itens vip-western suficientes
   const fetchContent = async (pageStart: number, isLoadMore = false) => {
     try {
@@ -226,48 +208,23 @@ const VIPWesternPage: React.FC = () => {
       setTotalPages(total);
       const hasMore = page < total && acc.length > 0;
       setHasMoreContent(hasMore);
-      setAllLoaded(!hasMore);
     } catch (error) {
       console.error("Error fetching VIP Western content:", error);
       // em erro, manter estado mínimo coerente
       if (!isLoadMore) {
         setFilteredLinks([]);
         setHasMoreContent(false);
-        setAllLoaded(true);
       }
     } finally {
       setLoading(false);
-      setLoadingMore(false);
       setLoadingMore(false);
       setSearchLoading(false);
     }
   };
 
-  // Infinite scroll handler
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = document.documentElement.scrollTop;
-      const scrollHeight = document.documentElement.scrollHeight;
-      const clientHeight = document.documentElement.clientHeight;
-      
-      if (
-        scrollTop + clientHeight >= scrollHeight - 1000 &&
-        hasMoreContent &&
-        !loadingMore &&
-        !loading &&
-        !allLoaded
-      ) {
-        handleLoadMore();
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasMoreContent, loadingMore, loading, allLoaded]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setAllLoaded(false);
       setHasMoreContent(true);
       fetchContent(1);
     }, 200);
@@ -275,7 +232,7 @@ const VIPWesternPage: React.FC = () => {
   }, [searchName, selectedCategory, selectedMonth, dateFilter]);
 
   const handleLoadMore = () => {
-    if (loadingMore || !hasMoreContent || currentPage >= totalPages || allLoaded) return;
+    if (loadingMore || !hasMoreContent || currentPage >= totalPages) return;
     const nextPage = currentPage + 1;
     setCurrentPage(nextPage);
     fetchContent(nextPage, true);
@@ -533,16 +490,28 @@ const VIPWesternPage: React.FC = () => {
 
               {hasMoreContent && (
                 <div className="text-center mt-12 py-8">
-                  {loadingMore && (
-                    <div className="flex items-center justify-center">
-                      <div className={`w-8 h-8 border-4 border-t-transparent rounded-full animate-spin ${
-                        isDark ? 'border-yellow-500' : 'border-yellow-600'
-                      }`}></div>
-                      <span className={`ml-3 text-lg font-medium ${
-                        isDark ? 'text-yellow-400' : 'text-yellow-600'
-                      }`}>Loading more VIP content...</span>
-                    </div>
-                  )}
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className={`px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 ${
+                      loadingMore
+                        ? 'bg-gray-600 cursor-not-allowed'
+                        : isDark
+                          ? 'bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 shadow-lg hover:shadow-yellow-500/30'
+                          : 'bg-gradient-to-r from-yellow-600 to-orange-700 hover:from-yellow-700 hover:to-orange-800 shadow-lg hover:shadow-yellow-500/20'
+                    } text-black`}
+                  >
+                    {loadingMore ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin inline-block mr-2" />
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More VIP Content'
+                    )}
+                  </motion.button>
                 </div>
               )}
             </>

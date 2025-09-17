@@ -56,7 +56,6 @@ const VIPBannedPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreContent, setHasMoreContent] = useState(true);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [totalPages, setTotalPages] = useState(1);
   const [sortOption, setSortOption] = useState<SortValue>("mostRecent");
   const [allLoaded, setAllLoaded] = useState(false);
 
@@ -92,7 +91,7 @@ const VIPBannedPage: React.FC = () => {
         page: String(page),
         sortBy: "postDate",
         sortOrder: sortOption === "oldest" ? "ASC" : "DESC",
-        limit: "150"
+        limit: "300"
       });
 
       if (searchName) params.append("search", searchName);
@@ -137,7 +136,6 @@ const VIPBannedPage: React.FC = () => {
       }
 
       setTotalPages(totalPages);
-      const hasMore = page < totalPages && rawData.length > 0;
       setHasMoreContent(hasMore);
       setAllLoaded(!hasMore);
 
@@ -157,36 +155,13 @@ const VIPBannedPage: React.FC = () => {
     } finally {
       setLoading(false);
       setLoadingMore(false);
-      setLoadingMore(false);
       setSearchLoading(false);
     }
   };
 
-  // Infinite scroll handler
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = document.documentElement.scrollTop;
-      const scrollHeight = document.documentElement.scrollHeight;
-      const clientHeight = document.documentElement.clientHeight;
-      
-      if (
-        scrollTop + clientHeight >= scrollHeight - 1000 &&
-        hasMoreContent &&
-        !loadingMore &&
-        !loading &&
-        !allLoaded
-      ) {
-        handleLoadMore();
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasMoreContent, loadingMore, loading, allLoaded]);
 
   useEffect(() => {
     const t = setTimeout(() => {
-      setAllLoaded(false);
       setHasMoreContent(true);
       fetchContent(1);
     }, 300);
@@ -195,7 +170,7 @@ const VIPBannedPage: React.FC = () => {
   }, [searchName, selectedCategory, selectedRegion, selectedMonth, sortOption]);
 
   const handleLoadMore = () => {
-    if (loadingMore || !hasMoreContent || currentPage >= totalPages || allLoaded) return;
+    if (loadingMore || !hasMoreContent || currentPage >= totalPages) return;
     const next = currentPage + 1;
     setCurrentPage(next);
     fetchContent(next, true);
@@ -445,16 +420,28 @@ const VIPBannedPage: React.FC = () => {
 
               {hasMoreContent && (
                 <div className="text-center mt-12 py-8">
-                  {loadingMore && (
-                    <div className="flex items-center justify-center">
-                      <div className={`w-8 h-8 border-4 border-t-transparent rounded-full animate-spin ${
-                        isDark ? 'border-yellow-500' : 'border-yellow-600'
-                      }`}></div>
-                      <span className={`ml-3 text-lg font-medium ${
-                        isDark ? 'text-yellow-400' : 'text-yellow-600'
-                      }`}>Loading more VIP content...</span>
-                    </div>
-                  )}
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className={`px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 ${
+                      loadingMore
+                        ? 'bg-gray-600 cursor-not-allowed'
+                        : isDark
+                          ? 'bg-gradient-to-r from-yellow-500 to-red-600 hover:from-yellow-600 hover:to-red-700 shadow-lg hover:shadow-yellow-500/30'
+                          : 'bg-gradient-to-r from-yellow-600 to-red-700 hover:from-yellow-700 hover:to-red-800 shadow-lg hover:shadow-yellow-500/20'
+                    } text-black`}
+                  >
+                    {loadingMore ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin inline-block mr-2" />
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More VIP Content'
+                    )}
+                  </motion.button>
                 </div>
               )}
             </>
