@@ -315,96 +315,73 @@ const AsianPage: React.FC = () => {
                     </h2>
 
                     <div className="space-y-2">
-                      {posts
-                        .sort(
-                          (a, b) =>
-                            new Date(b.postDate || b.createdAt).getTime() -
-                            new Date(a.postDate || a.createdAt).getTime()
-                        )
-                        .map((link, index) => (
-                          <motion.div
-                            key={link.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                            className={`group rounded-xl p-0 transition-all duration-300 backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-[1.01] border ${
-                              isDark
-                                ? "bg-gray-800/60 hover:bg-gray-700/80 border-gray-700/50 hover:border-purple-500/50 hover:shadow-purple-500/10"
-                                : "bg-white/60 hover:bg-gray-50/80 border-gray-200/50 hover:border-purple-400/50 hover:shadow-purple-400/10"
-                            }`}
-                          >
-                            <Link
-                              to={getPath(link)}
-                              className="relative block rounded-xl p-3 focus:outline-none"
-                              draggable={false}
-                            >
-                              <span aria-hidden className="pointer-events-none absolute inset-0" />
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ">
-                                <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-                                  {link.contentType && (
-                                    <div
-                                      className={`w-2 h-2 rounded-full ${
-                                        link.contentType === "asian"
-                                          ? "bg-purple-400"
-                                          : link.contentType === "banned"
-                                          ? "bg-red-400"
-                                          : link.contentType === "unknown"
-                                          ? "bg-gray-400"
-                                          : link.contentType === "vip"
-                                          ? "bg-yellow-400"
-                                          : link.contentType === "western"
-                                          ? "bg-orange-400"
-                                          : "bg-purple-400"
-                                      }`}
-                                    ></div>
-                                  )}
-
-                                  <h3
-                                    className={`text-sm sm:text-lg font-bold transition-colors duration-300 font-orbitron relative truncate ${
-                                      isDark ? "text-white group-hover:text-purple-300" : "text-gray-900 group-hover:text-purple-600"
-                                    }`}
-                                  >
-                                    {link.name}
-                                    <div className="absolute -bottom-1 left-0 w-16 h-0.5 bg-gradient-to-r from-purple-500 to-purple-300 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                                  </h3>
-
-                                  <div
-                                    className={`hidden sm:block h-px bg-gradient-to-r to-transparent flex-1 max-w-20 transition-all duration-300 ${
-                                      isDark ? "from-purple-500/50 group-hover:from-purple-400/70" : "from-purple-400/50 group-hover:from-purple-500/70"
-                                    }`}
-                                  ></div>
-                                </div>
-
-                                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                                  {recentLinks.includes(link) && (
-                                    <span
-                                      className={`inline-flex items-center px-2 sm:px-4 py-1 sm:py-2 text-white text-xs font-bold rounded-full shadow-lg animate-pulse border font-roboto ${
-                                        isDark
-                                          ? "bg-gradient-to-r from-purple-500 to-purple-600 border-purple-400/30"
-                                          : "bg-gradient-to-r from-purple-600 to-purple-700 border-purple-500/30"
-                                      }`}
-                                    >
-                                      <i className="fa-solid fa-star mr-1 text-xs hidden sm:inline"></i>
-                                      NEW
-                                    </span>
-                                  )}
-
-                                  <span
-                                    className={`inline-flex items-center px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm font-medium rounded-full border backdrop-blur-sm font-roboto ${
-                                      isDark ? "bg-gray-700/70 text-gray-300 border-gray-600/50" : "bg-gray-200/70 text-gray-700 border-gray-300/50"
-                                    }`}
-                                  >
-                                    <i className="fa-solid fa-tag mr-1 sm:mr-2 text-xs"></i>
-                                    {link.category}
-                                  </span>
-                                </div>
-                              </div>
-                            </Link>
-                          </motion.div>
-                        ))}
-                    </div>
-                  </div>
-                ))}
+                                          {posts
+                                            .sort((a, b) => new Date(b.postDate || b.createdAt).getTime() - new Date(a.postDate || a.createdAt).getTime())
+                                            .map((link, index) => (
+                                           <Link to={getPath(link)}
+                                                  className="relative block rounded-xl p-1 focus:outline-none"
+                                            draggable={false}>
+                                            <motion.div
+                                              key={link.id}
+                                              initial={{ opacity: 0, y: 20 }}
+                                              animate={{ opacity: 1, y: 0 }}
+                                              transition={{ delay: index * 0.05 }}
+                                              className={`group rounded-xl p-3 transition-all duration-300 cursor-pointer backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-[1.01] border ${
+                                                isDark 
+                                                  ? 'bg-gray-800/60 hover:bg-gray-700/80 border-gray-700/50 hover:border-purple-500/50 hover:shadow-purple-500/10'
+                                                  : 'bg-white/60 hover:bg-gray-50/80 border-gray-200/50 hover:border-purple-400/50 hover:shadow-purple-400/10'
+                                              } border`}
+                                            >
+                                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                                <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                                                  {link.contentType &&(
+                                                    <div className={`w-2 h-2 rounded-full ${
+                                                      link.contentType === 'asian' ? 'bg-purple-400' :
+                                                      link.contentType === 'banned' ? 'bg-red-400' :
+                                                      link.contentType === 'unknown' ? 'bg-gray-400' :
+                                                      link.contentType === 'western' ? 'bg-orange-400' :
+                                                      link.contentType === 'vip' ? 'bg-yellow-400' : 'bg-purple-400'
+                                                    }`}></div>
+                                                  )}
+                                                  <h3 className={`text-sm sm:text-lg font-bold transition-colors duration-300 font-orbitron relative truncate ${
+                                                    isDark ? 'text-white group-hover:text-purple-300' : 'text-gray-900 group-hover:text-purple-600'
+                                                  }`}>
+                                                    {link.name}
+                                                    <div className="absolute -bottom-1 left-0 w-16 h-0.5 bg-gradient-to-r from-purple-500 to-purple-300 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                                  </h3>
+                                                  <div className={`hidden sm:block h-px bg-gradient-to-r to-transparent flex-1 max-w-20 transition-all duration-300 ${
+                                                    isDark 
+                                                      ? 'from-purple-500/50 group-hover:from-purple-400/70'
+                                                      : 'from-purple-400/50 group-hover:from-purple-500/70'
+                                                  }`}></div>
+                                                </div>
+                                                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                                                  {recentLinks.includes(link) && (
+                                                    <span className={`inline-flex items-center px-2 sm:px-4 py-1 sm:py-2 text-white text-xs font-bold rounded-full shadow-lg animate-pulse border font-roboto ${
+                                                      isDark 
+                                                        ? 'bg-gradient-to-r from-purple-500 to-purple-600 border-purple-400/30'
+                                                        : 'bg-gradient-to-r from-purple-600 to-purple-700 border-purple-500/30'
+                                                    }`}>
+                                                      <i className="fa-solid fa-star mr-1 text-xs hidden sm:inline"></i>
+                                                      NEW
+                                                    </span>
+                                                  )}
+                                                  <span className={`inline-flex items-center px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm font-medium rounded-full border backdrop-blur-sm font-roboto ${
+                                                    isDark 
+                                                      ? 'bg-gray-700/70 text-gray-300 border-gray-600/50'
+                                                      : 'bg-gray-200/70 text-gray-700 border-gray-300/50'
+                                                  }`}>
+                                                    <i className="fa-solid fa-tag mr-1 sm:mr-2 text-xs"></i>
+                                                    {link.category}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            </motion.div>
+                                           </Link>
+                                            ))}
+                                        </div>
+                                      </div>
+                                    ))}
 
               {hasMoreContent && (
                 <div className="text-center mt-12">

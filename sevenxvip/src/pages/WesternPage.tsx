@@ -332,14 +332,14 @@ const WesternPage: React.FC = () => {
                         .sort((a, b) => new Date(b.postDate || b.createdAt).getTime() - new Date(a.postDate || a.createdAt).getTime())
                         .map((link, index) => (
                        <Link to={getPath(link)}
-                        className="relative block rounded-xl p-3 focus:outline-none"
+                              className="relative block rounded-xl p-1 focus:outline-none"
                         draggable={false}>
                         <motion.div
                           key={link.id}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.05 }}
-                          className={`group rounded-xl p-3 transition-all duration-300 cursor-pointer backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-[1.01] ${
+                          className={`group rounded-xl p-3 transition-all duration-300 cursor-pointer backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-[1.01] border ${
                             isDark 
                               ? 'bg-gray-800/60 hover:bg-gray-700/80 border-gray-700/50 hover:border-orange-500/50 hover:shadow-orange-500/10'
                               : 'bg-white/60 hover:bg-gray-50/80 border-gray-200/50 hover:border-orange-400/50 hover:shadow-orange-400/10'
@@ -347,11 +347,12 @@ const WesternPage: React.FC = () => {
                         >
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-                              {link.contentType && link.contentType !== 'western' && (
+                              {link.contentType &&(
                                 <div className={`w-2 h-2 rounded-full ${
                                   link.contentType === 'asian' ? 'bg-purple-400' :
                                   link.contentType === 'banned' ? 'bg-red-400' :
                                   link.contentType === 'unknown' ? 'bg-gray-400' :
+                                  link.contentType === 'western' ? 'bg-orange-400' :
                                   link.contentType === 'vip' ? 'bg-yellow-400' : 'bg-orange-400'
                                 }`}></div>
                               )}

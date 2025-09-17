@@ -300,7 +300,7 @@ const UnknownContent: React.FC = () => {
                           })
                           .map((link, index) => (
                            <Link to={getPath(link)}
-                            className="relative block rounded-xl p-3 focus:outline-none"
+                            className="relative block rounded-xl p-1 focus:outline-none"
                             draggable={false}>
                             <motion.div
                               key={link.id}
