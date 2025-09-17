@@ -197,12 +197,23 @@ router.get('/', async (req, res) => {
     const where = {};
     if (region) where.region = region;
 
-    const asianContents = await AsianContent.findAll({
-      where,
-      limit,
-      offset,
-      order: [['postDate', 'DESC']],
-    });
+    // Adicionar timeout e retry para queries
+    const asianContents = await Promise.race([
+      AsianContent.findAll({
+        where,
+        limit,
+        offset,
+        order: [['postDate', 'DESC']],
+        timeout: 30000,
+        retry: {
+          max: 2,
+          match: [/ConnectionError/, /TimeoutError/, /ConnectionAcquireTimeoutError/]
+        }
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 30000)
+      )
+    ]);
 
     console.log('AsianContent found:', asianContents.length, 'items');
 
@@ -212,7 +223,10 @@ router.get('/', async (req, res) => {
 
   } catch (error) {
     console.error('Error in AsianContent GET /:', error);
-    res.status(500).json({ error: 'Erro ao buscar conteúdos asiáticos: ' + error.message });
+    // Retorna resposta vazia em caso de erro
+    const emptyPayload = { page: parseInt(req.query.page) || 1, perPage: 900, data: [] };
+    const encodedPayload = encodePayloadToBase64(emptyPayload);
+    res.status(200).json({ data: encodedPayload });
   }
 });
 

@@ -186,12 +186,23 @@ router.get('/', async (req, res) => {
     const where = {};
     if (region) where.region = region;
 
-    const westernContents = await WesternContent.findAll({
-      where,
-      limit,
-      offset,
-      order: [['postDate', 'DESC']],
-    });
+    // Adicionar timeout e retry para queries
+    const westernContents = await Promise.race([
+      WesternContent.findAll({
+        where,
+        limit,
+        offset,
+        order: [['postDate', 'DESC']],
+        timeout: 30000,
+        retry: {
+          max: 2,
+          match: [/ConnectionError/, /TimeoutError/, /ConnectionAcquireTimeoutError/]
+        }
+      }),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 30000)
+      )
+    ]);
 
     console.log('WesternContent found:', westernContents.length, 'items');
 
@@ -201,7 +212,10 @@ router.get('/', async (req, res) => {
 
   } catch (error) {
     console.error('Error in WesternContent GET /:', error);
-    res.status(500).json({ error: 'Erro ao buscar conteúdos ocidentais: ' + error.message });
+    // Retorna resposta vazia em caso de erro
+    const emptyPayload = { page: parseInt(req.query.page) || 1, perPage: 900, data: [] };
+    const encodedPayload = encodePayloadToBase64(payload);
+    res.status(200).json({ data: encodedPayload });
   }
 });
 

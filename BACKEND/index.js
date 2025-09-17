@@ -150,33 +150,90 @@ app.use((req, res, next) => {
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL, 
-});
-
-pool.connect((err, client, done) => {
-  if (err) {
-    console.error('Erro ao conectar ao banco de dados:', err);
-    return;
+  max: 3, // Máximo de conexões no pool
+  min: 0,
+  idle: 5000,
+  connectionTimeoutMillis: 60000,
+  idleTimeoutMillis: 30000,
+  allowExitOnIdle: true,
+  ssl: {
+    require: true,
+    rejectUnauthorized: false
   }
-  console.log('Conexão bem-sucedida ao banco de dados');
-  console.log('DB URL:', process.env.POSTGRES_URL);
-  done();
 });
 
-db.sequelize.sync({ alter: true });
+// Teste de conexão mais robusto
+const testConnection = async () => {
+  try {
+    const client = await pool.connect();
+    console.log('Conexão bem-sucedida ao banco de dados');
+    client.release();
+  } catch (err) {
+    console.error('Erro ao conectar ao banco de dados:', err);
+  }
+};
 
-db.sequelize.authenticate()
-  .then(() => {
-    console.log('Conexão com o banco de dados estabelecida com sucesso.');
-    return db.sequelize.sync();
-  })
-  .then(() => {
-    const PORT = process.env.PORT || 3001;
-    app.listen(PORT, () => {
-      console.log(`Servidor rodando na porta ${PORT}...`);
-    });
-  })
-  .catch(err => {
-    console.error('Erro ao conectar ao banco de dados Sequelize:', err);
-  });
+// Configuração mais robusta do Sequelize
+const initializeDatabase = async () => {
+  try {
+    // Teste de autenticação
+    await db.sequelize.authenticate();
+    console.log('Conexão Sequelize estabelecida com sucesso.');
+    
+    // Sync apenas em desenvolvimento
+    if (process.env.NODE_ENV === 'development') {
+      await db.sequelize.sync({ alter: true });
+      console.log('Database sync completed.');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Erro na inicialização do banco:', error);
+    return false;
+  }
+};
+
+// Inicialização assíncrona
+(async () => {
+  try {
+    // Testa conexão do pool
+    await testConnection();
+    
+    // Inicializa Sequelize
+    const dbInitialized = await initializeDatabase();
+    
+    if (dbInitialized) {
+      const PORT = process.env.PORT || 3001;
+      const server = app.listen(PORT, () => {
+        console.log(`Servidor rodando na porta ${PORT}...`);
+      });
+      
+      // Graceful shutdown
+      process.on('SIGTERM', async () => {
+        console.log('SIGTERM recebido, fechando servidor...');
+        server.close(async () => {
+          await db.sequelize.close();
+          await pool.end();
+          process.exit(0);
+        });
+      });
+      
+      process.on('SIGINT', async () => {
+        console.log('SIGINT recebido, fechando servidor...');
+        server.close(async () => {
+          await db.sequelize.close();
+          await pool.end();
+          process.exit(0);
+        });
+      });
+    } else {
+      console.error('Falha na inicialização do banco de dados');
+      process.exit(1);
+    }
+  } catch (error) {
+    console.error('Erro fatal na inicialização:', error);
+    process.exit(1);
+  }
+})();
 
   module.exports = app;

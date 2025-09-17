@@ -145,20 +145,47 @@ router.get('/search', async (req, res) => {
       tablesToSearch.push({ model: VipUnknownContent, type: 'vip-unknown' });
     }
 
-    // Buscar em todas as tabelas relevantes
-    for (const { model, type } of tablesToSearch) {
+    // Buscar em todas as tabelas relevantes com timeout e retry
+    const searchPromises = tablesToSearch.map(async ({ model, type }) => {
       try {
-        const results = await model.findAll({
-          where: finalWhere,
-          order: [[sortBy, sortOrder]],
-          raw: true
-        });
+        // Adicionar timeout específico para cada query
+        const results = await Promise.race([
+          model.findAll({
+            where: finalWhere,
+            order: [[sortBy, sortOrder]],
+            raw: true,
+            timeout: 30000, // 30 segundos timeout por query
+            retry: {
+              max: 2,
+              match: [/ConnectionError/, /TimeoutError/, /ConnectionAcquireTimeoutError/]
+            }
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error(`Query timeout for ${type}`)), 30000)
+          )
+        ]);
         
-        const resultsWithType = results.map(item => ({ ...item, contentType: type }));
-        allResults = [...allResults, ...resultsWithType];
+        return results.map(item => ({ ...item, contentType: type }));
       } catch (error) {
-        console.error(`Erro ao buscar em ${type}:`, error);
+        console.error(`Erro ao buscar em ${type}:`, error.message);
+        // Retorna array vazio em caso de erro para não quebrar a busca
+        return [];
       }
+    });
+
+    // Executar todas as buscas em paralelo com timeout global
+    try {
+      const searchResults = await Promise.allSettled(searchPromises);
+      
+      searchResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          allResults = [...allResults, ...result.value];
+        } else {
+          console.error(`Busca falhou para ${tablesToSearch[index].type}:`, result.reason);
+        }
+      });
+    } catch (error) {
+      console.error('Erro geral na busca universal:', error);
     }
 
     // Ordenar todos os resultados por data
@@ -185,7 +212,16 @@ router.get('/search', async (req, res) => {
 
   } catch (error) {
     console.error('Erro na busca universal:', error);
-    res.status(500).json({ error: 'Erro ao buscar conteúdos: ' + error.message });
+    // Em caso de erro crítico, retorna resposta vazia mas válida
+    const emptyPayload = {
+      page: parseInt(req.query.page) || 1,
+      perPage: parseInt(req.query.limit) || 24,
+      total: 0,
+      totalPages: 0,
+      data: []
+    };
+    const encodedPayload = encodePayloadToBase64(emptyPayload);
+    res.status(200).json({ data: encodedPayload });
   }
 });
 

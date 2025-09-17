@@ -19,25 +19,50 @@ if (url) {
   sequelize = new Sequelize(url, {
     dialect: 'postgres',
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
-    // mescla opções do config.json se existirem
-    ...(cfg.dialectOptions ? { dialectOptions: cfg.dialectOptions } : {}),
-    ...(cfg.pool ? { pool: cfg.pool } : {}),
-    // Configurações específicas para Vercel
-    ...(process.env.VERCEL ? {
-      dialectOptions: {
-        ssl: {
-          require: true,
-          rejectUnauthorized: false
-        }
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false
       },
-      pool: {
-        max: 5,
-        min: 0,
-        idle: 10000,
-        acquire: 30000,
-        evict: 1000
+      // Configurações de timeout para conexão
+      connectTimeout: 60000,
+      socketTimeout: 60000,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 0,
+    },
+    pool: {
+      max: 3, // Reduzido para evitar sobrecarga
+      min: 0,
+      idle: 5000, // Reduzido
+      acquire: 60000, // Aumentado para 60 segundos
+      evict: 1000,
+      handleDisconnects: true,
+      validate: (client) => {
+        return !client.connection._ending;
       }
-    } : {})
+    },
+    retry: {
+      match: [
+        /ConnectionError/,
+        /ConnectionRefusedError/,
+        /ConnectionTimedOutError/,
+        /TimeoutError/,
+        /SequelizeConnectionError/,
+        /SequelizeConnectionRefusedError/,
+        /SequelizeHostNotFoundError/,
+        /SequelizeHostNotReachableError/,
+        /SequelizeInvalidConnectionError/,
+        /SequelizeConnectionTimedOutError/,
+        /ConnectionAcquireTimeoutError/
+      ],
+      max: 3
+    },
+    // Configurações adicionais para produção
+    define: {
+      freezeTableName: true,
+      timestamps: true,
+      underscored: false
+    }
   });
 } else {
   sequelize = new Sequelize(cfg.database, cfg.username, cfg.password, {
@@ -45,8 +70,14 @@ if (url) {
     port: cfg.port,
     dialect: cfg.dialect || 'postgres',
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
-    ...(cfg.dialectOptions ? { dialectOptions: cfg.dialectOptions } : {}),
-    ...(cfg.pool ? { pool: cfg.pool } : {}),
+    dialectOptions: cfg.dialectOptions || {},
+    pool: cfg.pool || {
+      max: 3,
+      min: 0,
+      idle: 5000,
+      acquire: 60000,
+      evict: 1000
+    }
   });
 }
 
