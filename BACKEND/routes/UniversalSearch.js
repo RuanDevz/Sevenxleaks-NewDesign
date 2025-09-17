@@ -84,7 +84,7 @@ async function safeModelSearch(model, modelName, whereClause, sortBy, sortOrder)
       model.findAll({
         where: whereClause,
         order: [[sortBy, sortOrder]],
-        limit: 100, // Limita resultados para evitar queries pesadas
+        limit: 150, // Aumenta limite para 150
         raw: true,
         timeout: timeoutMs,
         logging: false
@@ -107,7 +107,7 @@ async function safeModelSearch(model, modelName, whereClause, sortBy, sortOrder)
         const simpleResult = await model.findAll({
           where: { name: { [Op.ne]: null } }, // Query mais simples
           order: [['id', 'DESC']],
-          limit: 900,
+          limit: 150,
           raw: true,
           timeout: 5000,
           logging: false

@@ -82,7 +82,7 @@ const WesternPage: React.FC = () => {
         page: page.toString(),
         sortBy: "postDate",
         sortOrder: "DESC",
-        limit: "900",
+        limit: "150",
       });
 
       if (searchName) params.append('search', searchName);
@@ -148,6 +148,23 @@ const WesternPage: React.FC = () => {
     }
   };
 
+  // Infinite scroll handler
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + document.documentElement.scrollTop >=
+        document.documentElement.offsetHeight - 1000 &&
+        hasMoreContent &&
+        !loadingMore &&
+        !loading
+      ) {
+        handleLoadMore();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMoreContent, loadingMore, loading]);
   useEffect(() => {
     const timer = setTimeout(() => {
       setCurrentPage(1);
@@ -397,30 +414,17 @@ const WesternPage: React.FC = () => {
                 ))}
 
               {hasMoreContent && (
-                <div className="text-center mt-12">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleLoadMore}
-                    disabled={loadingMore}
-                    className={`px-10 py-4 text-white font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform disabled:opacity-50 disabled:cursor-not-allowed border backdrop-blur-sm font-orbitron ${
-                      isDark 
-                        ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 hover:shadow-orange-500/30 border-orange-400/30'
-                        : 'bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 hover:shadow-orange-500/20 border-orange-500/30'
-                    }`}
-                  >
-                    {loadingMore ? (
-                      <>
-                        <i className="fa-solid fa-spinner fa-spin mr-3"></i>
-                        Loading More...
-                      </>
-                    ) : (
-                      <>
-                        <i className="fa-solid fa-plus mr-3"></i>
-                        Load More Content
-                      </>
-                    )}
-                  </motion.button>
+                <div className="text-center mt-12 py-8">
+                  {loadingMore && (
+                    <div className="flex items-center justify-center">
+                      <div className={`w-8 h-8 border-4 border-t-transparent rounded-full animate-spin ${
+                        isDark ? 'border-orange-500' : 'border-orange-600'
+                      }`}></div>
+                      <span className={`ml-3 text-lg font-medium ${
+                        isDark ? 'text-orange-400' : 'text-orange-600'
+                      }`}>Loading more content...</span>
+                    </div>
+                  )}
                 </div>
               )}
             </>

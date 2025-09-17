@@ -177,7 +177,7 @@ router.get('/search', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = 900;
+    const limit = parseInt(req.query.limit) || 150;
     const offset = (page - 1) * limit;
     const { region } = req.query;
 
@@ -187,7 +187,7 @@ router.get('/', async (req, res) => {
     // Query mais simples e rápida
     const westernContents = await WesternContent.findAll({
       where,
-      limit: Math.min(limit, 900), // Limita para evitar queries pesadas
+      limit: Math.min(limit, 150),
       offset,
       order: [['id', 'DESC']], // Usa ID ao invés de postDate
       raw: true,
@@ -195,7 +195,14 @@ router.get('/', async (req, res) => {
       logging: false
     });
 
-    const payload = { page, perPage: limit, data: westernContents };
+    const totalCount = await WesternContent.count({ where });
+    const payload = { 
+      page, 
+      perPage: limit, 
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      data: westernContents 
+    };
     const encodedPayload = encodePayloadToBase64(payload);
     res.status(200).json({ data: encodedPayload });
 
@@ -203,11 +210,13 @@ router.get('/', async (req, res) => {
     console.error('Erro em WesternContent:', error.message);
     const emptyPayload = { 
       page: parseInt(req.query.page) || 1, 
-      perPage: 900, 
+      perPage: parseInt(req.query.limit) || 150,
+      total: 0,
+      totalPages: 0,
       data: [],
       error: 'Timeout na consulta'
     };
-    const encodedPayload = encodePayloadToBase64(payload);
+    const encodedPayload = encodePayloadToBase64(emptyPayload);
     res.status(200).json({ data: encodedPayload });
   }
 });

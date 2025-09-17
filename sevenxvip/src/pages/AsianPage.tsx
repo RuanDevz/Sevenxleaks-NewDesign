@@ -83,7 +83,7 @@ const AsianPage: React.FC = () => {
         page: page.toString(),
         sortBy: "postDate",
         sortOrder: "DESC",
-        limit: "900",
+        limit: "150",
       });
 
       if (searchName) params.append("search", searchName);
@@ -141,6 +141,23 @@ const AsianPage: React.FC = () => {
     }
   };
 
+  // Infinite scroll handler
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + document.documentElement.scrollTop >=
+        document.documentElement.offsetHeight - 1000 &&
+        hasMoreContent &&
+        !loadingMore &&
+        !loading
+      ) {
+        handleLoadMore();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMoreContent, loadingMore, loading]);
   useEffect(() => {
     const timer = setTimeout(() => {
       setCurrentPage(1);
@@ -384,30 +401,17 @@ const AsianPage: React.FC = () => {
                                     ))}
 
               {hasMoreContent && (
-                <div className="text-center mt-12">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleLoadMore}
-                    disabled={loadingMore}
-                    className={`px-10 py-4 text-white font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform disabled:opacity-50 disabled:cursor-not-allowed border backdrop-blur-sm font-orbitron ${
-                      isDark
-                        ? "bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 hover:shadow-purple-500/30 border-purple-400/30"
-                        : "bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 hover:shadow-purple-500/20 border-purple-500/30"
-                    }`}
-                  >
-                    {loadingMore ? (
-                      <>
-                        <i className="fa-solid fa-spinner fa-spin mr-3"></i>
-                        Loading More...
-                      </>
-                    ) : (
-                      <>
-                        <i className="fa-solid fa-plus mr-3"></i>
-                        Load More Content
-                      </>
-                    )}
-                  </motion.button>
+                <div className="text-center mt-12 py-8">
+                  {loadingMore && (
+                    <div className="flex items-center justify-center">
+                      <div className={`w-8 h-8 border-4 border-t-transparent rounded-full animate-spin ${
+                        isDark ? 'border-purple-500' : 'border-purple-600'
+                      }`}></div>
+                      <span className={`ml-3 text-lg font-medium ${
+                        isDark ? 'text-purple-400' : 'text-purple-600'
+                      }`}>Loading more content...</span>
+                    </div>
+                  )}
                 </div>
               )}
             </>

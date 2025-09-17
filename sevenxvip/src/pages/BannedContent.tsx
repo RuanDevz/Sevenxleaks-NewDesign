@@ -68,7 +68,7 @@ const BannedContent: React.FC = () => {
         page: page.toString(),
         sortBy: "postDate",
         sortOrder: sortOption === "oldest" ? "ASC" : "DESC",
-        limit: "900",
+        limit: "150",
         category: "Banned", // Filter only Banned content
       });
 
@@ -115,6 +115,23 @@ const BannedContent: React.FC = () => {
     }
   };
 
+  // Infinite scroll handler
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + document.documentElement.scrollTop >=
+        document.documentElement.offsetHeight - 1000 &&
+        hasMoreContent &&
+        !loadingMore &&
+        !loading
+      ) {
+        handleLoadMore();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMoreContent, loadingMore, loading]);
   useEffect(() => {
     const timer = setTimeout(() => {
       setCurrentPage(1);
@@ -398,30 +415,17 @@ const BannedContent: React.FC = () => {
                   ))}
 
                 {hasMoreContent && (
-                  <div className="text-center mt-12">
-                    <motion.button
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={handleLoadMore}
-                      disabled={loadingMore}
-                      className={`px-10 py-4 text-white font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform disabled:opacity-50 disabled:cursor-not-allowed border backdrop-blur-sm font-orbitron ${
-                        isDark
-                          ? "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 hover:shadow-red-500/20 border-red-500/30"
-                          : "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 hover:shadow-red-500/10 border-red-600/30"
-                      }`}
-                    >
-                      {loadingMore ? (
-                        <>
-                          <i className="fa-solid fa-spinner fa-spin mr-3" />
-                          Loading More...
-                        </>
-                      ) : (
-                        <>
-                          <i className="fa-solid fa-plus mr-3" />
-                          Load More Content
-                        </>
-                      )}
-                    </motion.button>
+                  <div className="text-center mt-12 py-8">
+                    {loadingMore && (
+                      <div className="flex items-center justify-center">
+                        <div className={`w-8 h-8 border-4 border-t-transparent rounded-full animate-spin ${
+                          isDark ? 'border-red-500' : 'border-red-600'
+                        }`}></div>
+                        <span className={`ml-3 text-lg font-medium ${
+                          isDark ? 'text-red-400' : 'text-red-600'
+                        }`}>Loading more content...</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </>

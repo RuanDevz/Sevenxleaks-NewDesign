@@ -99,7 +99,7 @@ const VIPAsianPage: React.FC = () => {
         page: page.toString(),
         sortBy: "postDate",
         sortOrder: "DESC",
-        limit: "900",
+        limit: "150",
       });
 
       if (searchName) params.append("search", searchName);
@@ -163,6 +163,23 @@ const VIPAsianPage: React.FC = () => {
     }
   };
 
+  // Infinite scroll handler
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + document.documentElement.scrollTop >=
+        document.documentElement.offsetHeight - 1000 &&
+        hasMoreContent &&
+        !loadingMore &&
+        !loading
+      ) {
+        handleLoadMore();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMoreContent, loadingMore, loading]);
   useEffect(() => {
     const timer = setTimeout(() => {
       setCurrentPage(1);
@@ -428,30 +445,17 @@ const VIPAsianPage: React.FC = () => {
                 ))}
 
               {hasMoreContent && (
-                <div className="text-center mt-12">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleLoadMore}
-                    disabled={loadingMore}
-                    className={`px-10 py-4 font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform disabled:opacity-50 disabled:cursor-not-allowed border backdrop-blur-sm font-orbitron ${
-                      isDark
-                        ? "bg-gradient-to-r from-yellow-500 to-purple-600 hover:from-yellow-600 hover:to-purple-700 text-white hover:shadow-yellow-500/30 border-yellow-400/30"
-                        : "bg-gradient-to-r from-yellow-600 to-purple-700 hover:from-yellow-700 hover:to-purple-800 text-white hover:shadow-yellow-500/20 border-yellow-500/30"
-                    }`}
-                  >
-                    {loadingMore ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mr-3 inline-block"></div>
-                        Loading VIP Content...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-5 h-5 mr-3 inline-block" />
-                        Load More VIP Asian
-                      </>
-                    )}
-                  </motion.button>
+                <div className="text-center mt-12 py-8">
+                  {loadingMore && (
+                    <div className="flex items-center justify-center">
+                      <div className={`w-8 h-8 border-4 border-t-transparent rounded-full animate-spin ${
+                        isDark ? 'border-yellow-500' : 'border-yellow-600'
+                      }`}></div>
+                      <span className={`ml-3 text-lg font-medium ${
+                        isDark ? 'text-yellow-400' : 'text-yellow-600'
+                      }`}>Loading more VIP content...</span>
+                    </div>
+                  )}
                 </div>
               )}
             </>
