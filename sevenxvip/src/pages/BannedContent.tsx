@@ -39,6 +39,7 @@ const BannedContent: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const [allLoaded, setAllLoaded] = useState(false);
 
   function decodeModifiedBase64<T>(encodedStr: string): T {
     const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
@@ -62,6 +63,7 @@ const BannedContent: React.FC = () => {
   const fetchContent = async (page: number, isLoadMore = false) => {
     try {
       if (!isLoadMore) setLoading(true);
+      if (isLoadMore) setLoadingMore(true);
       setSearchLoading(true);
 
       const params = new URLSearchParams({
@@ -69,7 +71,7 @@ const BannedContent: React.FC = () => {
         sortBy: "postDate",
         sortOrder: sortOption === "oldest" ? "ASC" : "DESC",
         limit: "150",
-        category: "Banned", // Filter only Banned content
+        category: "Banned"
       });
 
       if (searchName) params.append('search', searchName);
@@ -102,14 +104,18 @@ const BannedContent: React.FC = () => {
       } else {
         setLinks(rawData);
         setFilteredLinks(rawData);
+        setCurrentPage(1);
       }
 
       setTotalPages(totalPages);
-      setHasMoreContent(page < totalPages && rawData.length > 0);
+      const hasMore = page < totalPages && rawData.length > 0;
+      setHasMoreContent(hasMore);
+      setAllLoaded(!hasMore);
     } catch (error) {
       console.error("Error fetching banned content:", error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
       setLoadingMore(false);
       setSearchLoading(false);
     }
@@ -118,12 +124,16 @@ const BannedContent: React.FC = () => {
   // Infinite scroll handler
   useEffect(() => {
     const handleScroll = () => {
+      const scrollTop = document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const clientHeight = document.documentElement.clientHeight;
+      
       if (
-        window.innerHeight + document.documentElement.scrollTop >=
-        document.documentElement.offsetHeight - 1000 &&
+        scrollTop + clientHeight >= scrollHeight - 1000 &&
         hasMoreContent &&
         !loadingMore &&
-        !loading
+        !loading &&
+        !allLoaded
       ) {
         handleLoadMore();
       }
@@ -131,10 +141,12 @@ const BannedContent: React.FC = () => {
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasMoreContent, loadingMore, loading]);
+  }, [hasMoreContent, loadingMore, loading, allLoaded]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      setCurrentPage(1);
+      setAllLoaded(false);
+      setHasMoreContent(true);
       fetchContent(1);
     }, 300);
     return () => clearTimeout(timer);
@@ -142,8 +154,7 @@ const BannedContent: React.FC = () => {
   }, [searchName, selectedMonth, sortOption]);
 
   const handleLoadMore = () => {
-    if (loadingMore || !hasMoreContent || currentPage >= totalPages) return;
-    setLoadingMore(true);
+    if (loadingMore || !hasMoreContent || currentPage >= totalPages || allLoaded) return;
     const nextPage = currentPage + 1;
     setCurrentPage(nextPage);
     fetchContent(nextPage, true);

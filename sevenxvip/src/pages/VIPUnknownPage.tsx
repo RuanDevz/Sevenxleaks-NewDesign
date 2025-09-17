@@ -57,6 +57,7 @@ const VIPUnknownPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [selectedMonth, setSelectedMonth] = useState("");
   const [sortOption, setSortOption] = useState<SortValue>("mostRecent");
+  const [allLoaded, setAllLoaded] = useState(false);
 
   function decodeModifiedBase64<T>(encodedStr: string): T {
     const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
@@ -83,6 +84,7 @@ const VIPUnknownPage: React.FC = () => {
   const fetchContent = async (page: number, isLoadMore = false) => {
     try {
       if (!isLoadMore) setLoading(true);
+      if (isLoadMore) setLoadingMore(true);
       setSearchLoading(true);
 
       const sortOrder = sortOption === "oldest" ? "ASC" : "DESC";
@@ -91,7 +93,7 @@ const VIPUnknownPage: React.FC = () => {
         page: page.toString(),
         sortBy: "postDate",
         sortOrder,
-        limit: "150",
+        limit: "150"
       });
 
       if (searchName) params.append("search", searchName);
@@ -132,10 +134,13 @@ const VIPUnknownPage: React.FC = () => {
       } else {
         setLinks(rawData);
         setFilteredLinks(rawData);
+        setCurrentPage(1);
       }
 
       setTotalPages(totalPages);
-      setHasMoreContent(page < totalPages && rawData.length > 0);
+      const hasMore = page < totalPages && rawData.length > 0;
+      setHasMoreContent(hasMore);
+      setAllLoaded(!hasMore);
 
       const uniqueCategories = Array.from(new Set(rawData.map((item) => item.category))).map(
         (category) => ({
@@ -155,6 +160,7 @@ const VIPUnknownPage: React.FC = () => {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      setLoadingMore(false);
       setSearchLoading(false);
     }
   };
@@ -162,12 +168,16 @@ const VIPUnknownPage: React.FC = () => {
   // Infinite scroll handler
   useEffect(() => {
     const handleScroll = () => {
+      const scrollTop = document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const clientHeight = document.documentElement.clientHeight;
+      
       if (
-        window.innerHeight + document.documentElement.scrollTop >=
-        document.documentElement.offsetHeight - 1000 &&
+        scrollTop + clientHeight >= scrollHeight - 1000 &&
         hasMoreContent &&
         !loadingMore &&
-        !loading
+        !loading &&
+        !allLoaded
       ) {
         handleLoadMore();
       }
@@ -175,10 +185,12 @@ const VIPUnknownPage: React.FC = () => {
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasMoreContent, loadingMore, loading]);
+  }, [hasMoreContent, loadingMore, loading, allLoaded]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      setCurrentPage(1);
+      setAllLoaded(false);
+      setHasMoreContent(true);
       fetchContent(1);
     }, 300);
 
@@ -186,8 +198,7 @@ const VIPUnknownPage: React.FC = () => {
   }, [searchName, selectedCategory, selectedRegion, selectedMonth, dateFilter, sortOption]);
 
   const handleLoadMore = () => {
-    if (loadingMore || !hasMoreContent || currentPage >= totalPages) return;
-    setLoadingMore(true);
+    if (loadingMore || !hasMoreContent || currentPage >= totalPages || allLoaded) return;
     const nextPage = currentPage + 1;
     setCurrentPage(nextPage);
     fetchContent(nextPage, true);

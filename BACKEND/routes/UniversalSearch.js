@@ -74,7 +74,7 @@ function createDateFilter(dateFilter, month) {
 }
 
 // Função para buscar com timeout e fallback
-async function safeModelSearch(model, modelName, whereClause, sortBy, sortOrder) {
+async function safeModelSearch(model, modelName, whereClause, sortBy, sortOrder, limit, offset) {
   const timeoutMs = 10000; // 10 segundos por query
   
   try {
@@ -84,7 +84,8 @@ async function safeModelSearch(model, modelName, whereClause, sortBy, sortOrder)
       model.findAll({
         where: whereClause,
         order: [[sortBy, sortOrder]],
-        limit: 150, // Aumenta limite para 150
+        limit,
+        offset,
         raw: true,
         timeout: timeoutMs,
         logging: false
@@ -107,7 +108,8 @@ async function safeModelSearch(model, modelName, whereClause, sortBy, sortOrder)
         const simpleResult = await model.findAll({
           where: { name: { [Op.ne]: null } }, // Query mais simples
           order: [['id', 'DESC']],
-          limit: 150,
+          limit,
+          offset,
           raw: true,
           timeout: 5000,
           logging: false
@@ -130,7 +132,7 @@ router.get('/search', async (req, res) => {
   
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 24;
+    const limit = Math.min(parseInt(req.query.limit) || 150, 150);
     const offset = (page - 1) * limit;
 
     const { 
@@ -173,49 +175,49 @@ router.get('/search', async (req, res) => {
     if (contentType === 'all' || contentType === 'asian') {
       searchTasks.push({
         name: 'asian',
-        task: () => safeModelSearch(AsianContent, 'AsianContent', finalWhere, sortBy, sortOrder)
+        task: () => safeModelSearch(AsianContent, 'AsianContent', finalWhere, sortBy, sortOrder, limit, offset)
       });
     }
     if (contentType === 'all' || contentType === 'western') {
       searchTasks.push({
         name: 'western',
-        task: () => safeModelSearch(WesternContent, 'WesternContent', finalWhere, sortBy, sortOrder)
+        task: () => safeModelSearch(WesternContent, 'WesternContent', finalWhere, sortBy, sortOrder, limit, offset)
       });
     }
     if (contentType === 'all' || contentType === 'banned') {
       searchTasks.push({
         name: 'banned',
-        task: () => safeModelSearch(BannedContent, 'BannedContent', finalWhere, sortBy, sortOrder)
+        task: () => safeModelSearch(BannedContent, 'BannedContent', finalWhere, sortBy, sortOrder, limit, offset)
       });
     }
     if (contentType === 'all' || contentType === 'unknown') {
       searchTasks.push({
         name: 'unknown',
-        task: () => safeModelSearch(UnknownContent, 'UnknownContent', finalWhere, sortBy, sortOrder)
+        task: () => safeModelSearch(UnknownContent, 'UnknownContent', finalWhere, sortBy, sortOrder, limit, offset)
       });
     }
     if (contentType === 'all' || contentType === 'vip-asian') {
       searchTasks.push({
         name: 'vip-asian',
-        task: () => safeModelSearch(VipAsianContent, 'VipAsianContent', finalWhere, sortBy, sortOrder)
+        task: () => safeModelSearch(VipAsianContent, 'VipAsianContent', finalWhere, sortBy, sortOrder, limit, offset)
       });
     }
     if (contentType === 'all' || contentType === 'vip-western') {
       searchTasks.push({
         name: 'vip-western',
-        task: () => safeModelSearch(VipWesternContent, 'VipWesternContent', finalWhere, sortBy, sortOrder)
+        task: () => safeModelSearch(VipWesternContent, 'VipWesternContent', finalWhere, sortBy, sortOrder, limit, offset)
       });
     }
     if (contentType === 'all' || contentType === 'vip-banned') {
       searchTasks.push({
         name: 'vip-banned',
-        task: () => safeModelSearch(VipBannedContent, 'VipBannedContent', finalWhere, sortBy, sortOrder)
+        task: () => safeModelSearch(VipBannedContent, 'VipBannedContent', finalWhere, sortBy, sortOrder, limit, offset)
       });
     }
     if (contentType === 'all' || contentType === 'vip-unknown') {
       searchTasks.push({
         name: 'vip-unknown',
-        task: () => safeModelSearch(VipUnknownContent, 'VipUnknownContent', finalWhere, sortBy, sortOrder)
+        task: () => safeModelSearch(VipUnknownContent, 'VipUnknownContent', finalWhere, sortBy, sortOrder, limit, offset)
       });
     }
 
@@ -301,7 +303,7 @@ router.get('/search', async (req, res) => {
     // Resposta de emergência
     const emergencyPayload = {
       page: parseInt(req.query.page) || 1,
-      perPage: parseInt(req.query.limit) || 24,
+      perPage: Math.min(parseInt(req.query.limit) || 150, 150),
       total: 0,
       totalPages: 0,
       data: [],

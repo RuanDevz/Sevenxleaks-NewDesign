@@ -58,6 +58,7 @@ const VIPBannedPage: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [sortOption, setSortOption] = useState<SortValue>("mostRecent");
+  const [allLoaded, setAllLoaded] = useState(false);
 
   function decodeModifiedBase64<T>(encodedStr: string): T {
     const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
@@ -84,13 +85,14 @@ const VIPBannedPage: React.FC = () => {
   const fetchContent = async (page: number, isLoadMore = false) => {
     try {
       if (!isLoadMore) setLoading(true);
+      if (isLoadMore) setLoadingMore(true);
       setSearchLoading(true);
 
       const params = new URLSearchParams({
         page: String(page),
         sortBy: "postDate",
         sortOrder: sortOption === "oldest" ? "ASC" : "DESC",
-        limit: "150",
+        limit: "150"
       });
 
       if (searchName) params.append("search", searchName);
@@ -131,10 +133,13 @@ const VIPBannedPage: React.FC = () => {
       } else {
         setLinks(rawData);
         setFilteredLinks(rawData);
+        setCurrentPage(1);
       }
 
       setTotalPages(totalPages);
-      setHasMoreContent(page < totalPages && rawData.length > 0);
+      const hasMore = page < totalPages && rawData.length > 0;
+      setHasMoreContent(hasMore);
+      setAllLoaded(!hasMore);
 
       const uniqueCategories = Array.from(new Set(rawData.map((i) => i.category))).map((category) => ({
         id: category,
@@ -152,6 +157,7 @@ const VIPBannedPage: React.FC = () => {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      setLoadingMore(false);
       setSearchLoading(false);
     }
   };
@@ -159,12 +165,16 @@ const VIPBannedPage: React.FC = () => {
   // Infinite scroll handler
   useEffect(() => {
     const handleScroll = () => {
+      const scrollTop = document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const clientHeight = document.documentElement.clientHeight;
+      
       if (
-        window.innerHeight + document.documentElement.scrollTop >=
-        document.documentElement.offsetHeight - 1000 &&
+        scrollTop + clientHeight >= scrollHeight - 1000 &&
         hasMoreContent &&
         !loadingMore &&
-        !loading
+        !loading &&
+        !allLoaded
       ) {
         handleLoadMore();
       }
@@ -172,10 +182,12 @@ const VIPBannedPage: React.FC = () => {
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [hasMoreContent, loadingMore, loading]);
+  }, [hasMoreContent, loadingMore, loading, allLoaded]);
+
   useEffect(() => {
     const t = setTimeout(() => {
-      setCurrentPage(1);
+      setAllLoaded(false);
+      setHasMoreContent(true);
       fetchContent(1);
     }, 300);
     return () => clearTimeout(t);
@@ -183,8 +195,7 @@ const VIPBannedPage: React.FC = () => {
   }, [searchName, selectedCategory, selectedRegion, selectedMonth, sortOption]);
 
   const handleLoadMore = () => {
-    if (loadingMore || !hasMoreContent || currentPage >= totalPages) return;
-    setLoadingMore(true);
+    if (loadingMore || !hasMoreContent || currentPage >= totalPages || allLoaded) return;
     const next = currentPage + 1;
     setCurrentPage(next);
     fetchContent(next, true);

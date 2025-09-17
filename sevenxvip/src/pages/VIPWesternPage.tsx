@@ -54,6 +54,7 @@ const VIPWesternPage: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "yesterday" | "7days">("all");
+  const [allLoaded, setAllLoaded] = useState(false);
 
   function decodeModifiedBase64<T>(encodedStr: string): T {
     const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
@@ -168,12 +169,13 @@ const VIPWesternPage: React.FC = () => {
   const fetchContent = async (pageStart: number, isLoadMore = false) => {
     try {
       if (!isLoadMore) setLoading(true);
+      if (isLoadMore) setLoadingMore(true);
       setSearchLoading(true);
 
       let page = pageStart;
       let acc: LinkItem[] = [];
       let pagesFetched = 0;
-      const maxPagesPerRun = isLoadMore ? 1 : 5; // evita loop longo
+      const maxPagesPerRun = 1; // sempre 1 página por vez
 
       // usar totalPages real após primeira página
       let total = totalPages;
@@ -218,36 +220,62 @@ const VIPWesternPage: React.FC = () => {
         setFilteredLinks((prev) => [...prev, ...acc]);
       } else {
         setFilteredLinks(acc);
-        setCurrentPage(page); // atualiza para a última página efetivamente usada
+        setCurrentPage(page);
       }
 
       setTotalPages(total);
-      setHasMoreContent(page < total);
+      const hasMore = page < total && acc.length > 0;
+      setHasMoreContent(hasMore);
+      setAllLoaded(!hasMore);
     } catch (error) {
       console.error("Error fetching VIP Western content:", error);
       // em erro, manter estado mínimo coerente
       if (!isLoadMore) {
         setFilteredLinks([]);
         setHasMoreContent(false);
+        setAllLoaded(true);
       }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
       setLoadingMore(false);
       setSearchLoading(false);
     }
   };
 
+  // Infinite scroll handler
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = document.documentElement.scrollTop;
+      const scrollHeight = document.documentElement.scrollHeight;
+      const clientHeight = document.documentElement.clientHeight;
+      
+      if (
+        scrollTop + clientHeight >= scrollHeight - 1000 &&
+        hasMoreContent &&
+        !loadingMore &&
+        !loading &&
+        !allLoaded
+      ) {
+        handleLoadMore();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [hasMoreContent, loadingMore, loading, allLoaded]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      setCurrentPage(1);
+      setAllLoaded(false);
+      setHasMoreContent(true);
       fetchContent(1);
     }, 200);
     return () => clearTimeout(timer);
   }, [searchName, selectedCategory, selectedMonth, dateFilter]);
 
   const handleLoadMore = () => {
-    if (loadingMore || !hasMoreContent || currentPage >= totalPages) return;
-    setLoadingMore(true);
+    if (loadingMore || !hasMoreContent || currentPage >= totalPages || allLoaded) return;
     const nextPage = currentPage + 1;
     setCurrentPage(nextPage);
     fetchContent(nextPage, true);

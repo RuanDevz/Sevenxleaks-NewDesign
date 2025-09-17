@@ -188,7 +188,7 @@ router.get('/search', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const { region } = req.query;
+    const limit = Math.min(parseInt(req.query.limit) || 150, 150);
 
     const where = {};
     if (region) where.region = region;
@@ -196,7 +196,7 @@ router.get('/', async (req, res) => {
     // Query mais simples e rápida
     const asianContents = await AsianContent.findAll({
       where,
-      limit: Math.min(limit, 900),
+      limit,
       offset,
       order: [['id', 'DESC']], // Usa ID ao invés de postDate para melhor performance
       raw: true,
@@ -219,7 +219,7 @@ router.get('/', async (req, res) => {
     console.error('Erro em AsianContent:', error.message);
     const emptyPayload = { 
       page: parseInt(req.query.page) || 1, 
-      perPage: parseInt(req.query.limit) || 900,
+      perPage: Math.min(parseInt(req.query.limit) || 150, 150),
       total: 0,
       totalPages: 0,
       data: [],

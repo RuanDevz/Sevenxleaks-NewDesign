@@ -177,7 +177,7 @@ router.get('/search', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 150;
+    const limit = Math.min(parseInt(req.query.limit) || 150, 150);
     const offset = (page - 1) * limit;
     const { region } = req.query;
 
@@ -187,7 +187,7 @@ router.get('/', async (req, res) => {
     // Query mais simples e rápida
     const westernContents = await WesternContent.findAll({
       where,
-      limit: Math.min(limit, 150),
+      limit,
       offset,
       order: [['id', 'DESC']], // Usa ID ao invés de postDate
       raw: true,
@@ -210,7 +210,7 @@ router.get('/', async (req, res) => {
     console.error('Erro em WesternContent:', error.message);
     const emptyPayload = { 
       page: parseInt(req.query.page) || 1, 
-      perPage: parseInt(req.query.limit) || 150,
+      perPage: Math.min(parseInt(req.query.limit) || 150, 150),
       total: 0,
       totalPages: 0,
       data: [],
