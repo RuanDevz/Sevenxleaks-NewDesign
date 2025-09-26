@@ -58,6 +58,8 @@ const VIPBannedPage: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [sortOption, setSortOption] = useState<SortValue>("mostRecent");
   const [allLoaded, setAllLoaded] = useState(false);
+  const [totalPages, setTotalPages] = useState(1);
+  
 
   function decodeModifiedBase64<T>(encodedStr: string): T {
     const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
@@ -81,83 +83,84 @@ const VIPBannedPage: React.FC = () => {
   return `/vip-asian/${l.slug}`;
 };
 
-  const fetchContent = async (page: number, isLoadMore = false) => {
-    try {
-      if (!isLoadMore) setLoading(true);
-      if (isLoadMore) setLoadingMore(true);
-      setSearchLoading(true);
+ const fetchContent = async (page: number, isLoadMore = false) => {
+  try {
+    if (!isLoadMore) setLoading(true);
+    if (isLoadMore) setLoadingMore(true);
+    setSearchLoading(true);
 
-      const params = new URLSearchParams({
-        page: String(page),
-        sortBy: "postDate",
-        sortOrder: sortOption === "oldest" ? "ASC" : "DESC",
-        limit: "300"
-      });
+    const params = new URLSearchParams({
+      page: String(page),
+      sortBy: "postDate",
+      sortOrder: sortOption === "oldest" ? "ASC" : "DESC",
+      limit: "300",
+    });
 
-      if (searchName) params.append("search", searchName);
-      if (selectedCategory) params.append("category", selectedCategory);
-      if (selectedRegion) params.append("region", selectedRegion);
-      if (selectedMonth) params.append("month", selectedMonth);
+    if (searchName) params.append("search", searchName);
+    if (selectedCategory) params.append("category", selectedCategory);
+    if (selectedRegion) params.append("region", selectedRegion);
+    if (selectedMonth) params.append("month", selectedMonth);
 
-      const response = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/universal-search/search?${params}`,
-        {
-          headers: {
-            "x-api-key": `${import.meta.env.VITE_FRONTEND_API_KEY}`,
-            Authorization: `Bearer ${localStorage.getItem("Token")}`,
-          },
-        }
-      );
-
-      if (!response.data?.data) throw new Error("Invalid server response");
-
-      const decoded = decodeModifiedBase64<{ data: LinkItem[]; totalPages: number }>(
-        response.data.data
-      );
-
-      const { data: allData, totalPages } = decoded;
-      
-      // Se há busca, mostra todo conteúdo VIP. Se não há busca, mostra apenas VIP Banned
-      const rawData = searchName 
-        ? allData.filter(item => item.contentType && item.contentType.startsWith('vip')) // Busca global VIP
-        : allData.filter(item => {
-            // Sem busca: mostra conteúdo VIP com categoria "Banned" de qualquer origem VIP
-            return item.contentType && item.contentType.startsWith('vip') && 
-                   (item.category === "Banned" || item.category === "VIP Banned");
-          });
-
-      if (isLoadMore) {
-        setLinks((prev) => [...prev, ...rawData]);
-        setFilteredLinks((prev) => [...prev, ...rawData]);
-      } else {
-        setLinks(rawData);
-        setFilteredLinks(rawData);
-        setCurrentPage(1);
+    const response = await axios.get(
+      `${import.meta.env.VITE_BACKEND_URL}/universal-search/search?${params}`,
+      {
+        headers: {
+          "x-api-key": `${import.meta.env.VITE_FRONTEND_API_KEY}`,
+          Authorization: `Bearer ${localStorage.getItem("Token")}`,
+        },
       }
+    );
 
-      setTotalPages(totalPages);
-      setHasMoreContent(hasMore);
-      setAllLoaded(!hasMore);
+    if (!response.data?.data) throw new Error("Invalid server response");
 
-      const uniqueCategories = Array.from(new Set(rawData.map((i) => i.category))).map((category) => ({
-        id: category,
-        name: category,
-        category,
-      }));
+    const decoded = decodeModifiedBase64<{ data: LinkItem[]; totalPages: number }>(
+      response.data.data
+    );
 
-      setCategories((prev) => {
-        const existing = new Set(prev.map((c) => c.category));
-        const news = uniqueCategories.filter((c) => !existing.has(c.category));
-        return [...prev, ...news];
-      });
-    } catch (error) {
-      console.error("Error fetching VIP Banned content:", error);
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-      setSearchLoading(false);
+    const { data: allData, totalPages: totalPagesFromApi } = decoded;
+
+    const rawData = searchName
+      ? allData.filter(item => item.contentType && item.contentType.startsWith("vip"))
+      : allData.filter(item =>
+          item.contentType &&
+          item.contentType.startsWith("vip") &&
+          (item.category === "Banned" || item.category === "VIP Banned")
+        );
+
+    if (isLoadMore) {
+      setLinks(prev => [...prev, ...rawData]);
+      setFilteredLinks(prev => [...prev, ...rawData]);
+    } else {
+      setLinks(rawData);
+      setFilteredLinks(rawData);
+      setCurrentPage(1);
     }
-  };
+
+    // atualiza paginação
+    setTotalPages(totalPagesFromApi);
+    const hasMorePages = page < totalPagesFromApi;
+    setHasMoreContent(hasMorePages);
+    setAllLoaded(!hasMorePages);
+
+    const uniqueCategories = Array.from(new Set(rawData.map(i => i.category))).map(category => ({
+      id: category,
+      name: category,
+      category,
+    }));
+
+    setCategories(prev => {
+      const existing = new Set(prev.map(c => c.category));
+      const news = uniqueCategories.filter(c => !existing.has(c.category));
+      return [...prev, ...news];
+    });
+  } catch (error) {
+    console.error("Error fetching VIP Banned content:", error);
+  } finally {
+    setLoading(false);
+    setLoadingMore(false);
+    setSearchLoading(false);
+  }
+};
 
 
   useEffect(() => {
