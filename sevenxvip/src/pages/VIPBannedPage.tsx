@@ -4,7 +4,7 @@ import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Helmet } from "react-helmet";
-import { Crown, Plus, Star, Shield, TriangleAlert as AlertTriangle } from "lucide-react";
+import { Crown, Plus, Star, Shield, AlertTriangle } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 import MonthFilter from "../components/MonthFilter";
 import SortFilter, { SortValue } from "../components/SortFilter";
@@ -59,7 +59,6 @@ const VIPBannedPage: React.FC = () => {
   const [sortOption, setSortOption] = useState<SortValue>("mostRecent");
   const [allLoaded, setAllLoaded] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
-  const [lastPostDate, setLastPostDate] = useState<string>("");
   
 
   function decodeModifiedBase64<T>(encodedStr: string): T {
@@ -91,19 +90,11 @@ const VIPBannedPage: React.FC = () => {
     setSearchLoading(true);
 
     const params = new URLSearchParams({
+      page: String(page),
       sortBy: "postDate",
       sortOrder: sortOption === "oldest" ? "ASC" : "DESC",
-      limit: "50",
+      limit: "300",
     });
-
-    // Para load more, usar cursor baseado na última data
-    if (isLoadMore && lastPostDate) {
-      if (sortOption === "oldest") {
-        params.append("afterDate", lastPostDate);
-      } else {
-        params.append("beforeDate", lastPostDate);
-      }
-    }
 
     if (searchName) params.append("search", searchName);
     if (selectedCategory) params.append("category", selectedCategory);
@@ -136,13 +127,6 @@ const VIPBannedPage: React.FC = () => {
           (item.category === "Banned" || item.category === "VIP Banned")
         );
 
-    // Ordenar por data para garantir ordem cronológica
-    rawData.sort((a, b) => {
-      const dateA = new Date(a.postDate || a.createdAt).getTime();
-      const dateB = new Date(b.postDate || b.createdAt).getTime();
-      return sortOption === "oldest" ? dateA - dateB : dateB - dateA;
-    });
-
     if (isLoadMore) {
       setLinks(prev => [...prev, ...rawData]);
       setFilteredLinks(prev => [...prev, ...rawData]);
@@ -150,19 +134,13 @@ const VIPBannedPage: React.FC = () => {
       setLinks(rawData);
       setFilteredLinks(rawData);
       setCurrentPage(1);
-      setLastPostDate("");
     }
 
-    // Atualizar a última data para próximo load more
-    if (rawData.length > 0) {
-      const lastItem = rawData[rawData.length - 1];
-      setLastPostDate(lastItem.postDate || lastItem.createdAt);
-    }
-
+    // atualiza paginação
     setTotalPages(totalPagesFromApi);
-    const hasMore = rawData.length >= 50; // Se retornou o limite, pode haver mais
-    setHasMoreContent(hasMore);
-    setAllLoaded(!hasMore);
+    const hasMorePages = page < totalPagesFromApi;
+    setHasMoreContent(hasMorePages);
+    setAllLoaded(!hasMorePages);
 
     const uniqueCategories = Array.from(new Set(rawData.map(i => i.category))).map(category => ({
       id: category,
@@ -188,7 +166,6 @@ const VIPBannedPage: React.FC = () => {
   useEffect(() => {
     const t = setTimeout(() => {
       setHasMoreContent(true);
-      setLastPostDate("");
       fetchContent(1);
     }, 300);
     return () => clearTimeout(t);
@@ -196,8 +173,10 @@ const VIPBannedPage: React.FC = () => {
   }, [searchName, selectedCategory, selectedRegion, selectedMonth, sortOption]);
 
   const handleLoadMore = () => {
-    if (loadingMore || !hasMoreContent) return;
-    fetchContent(1, true);
+    if (loadingMore || !hasMoreContent || currentPage >= totalPages) return;
+    const next = currentPage + 1;
+    setCurrentPage(next);
+    fetchContent(next, true);
   };
 
   const recentLinks = filteredLinks.slice(0, 5);

@@ -92,7 +92,7 @@ router.get('/search', async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
 
-    const { search, category, month, region, sortBy = 'postDate', sortOrder = 'DESC' } = req.query;
+    const { search, category, month, sortBy = 'postDate', sortOrder = 'DESC' } = req.query;
 
     let allResults = [];
 
@@ -110,7 +110,6 @@ router.get('/search', async (req, res) => {
         };
       }
       if (category) searchWhere.category = category;
-      if (region) searchWhere.region = region;
 
       const commonOpts = {
         where: searchWhere,
@@ -144,7 +143,6 @@ router.get('/search', async (req, res) => {
     } else {
       const where = {};
       if (category) where.category = category;
-      if (region) where.region = region;
       if (month) {
         where.postDate = {
           [Op.and]: [
@@ -188,33 +186,32 @@ router.get('/search', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50;
+    const limit = parseInt(req.query.limit) || 300;
     const offset = (page - 1) * limit;
 
-    const { region } = req.query; // CORREÇÃO
     const where = {};
-    if (region) where.region = region;
 
     const asianContents = await AsianContent.findAll({
       where,
       limit,
       offset,
-      // usar COALESCE para consistir com o front (postDate || createdAt)
-      order: [[Sequelize.fn('COALESCE', Sequelize.col('postDate'), Sequelize.col('createdAt')), 'DESC']],
+      order: [['postDate', 'DESC']],
       raw: true
     });
 
     const totalCount = await AsianContent.count({ where });
-    const payload = {
-      page,
-      perPage: limit,
+    const payload = { 
+      page, 
+      perPage: limit, 
       total: totalCount,
       totalPages: Math.ceil(totalCount / limit),
-      data: asianContents
+      data: asianContents 
     };
     const encodedPayload = encodePayloadToBase64(payload);
     res.status(200).json({ data: encodedPayload });
+
   } catch (error) {
+    console.error('Erro em AsianContent:', error.message);
     res.status(500).json({ error: 'Erro ao buscar conteúdos asiáticos: ' + error.message });
   }
 });

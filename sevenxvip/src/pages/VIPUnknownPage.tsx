@@ -3,7 +3,7 @@ import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Helmet } from "react-helmet";
-import { Crown, Plus, Star, Sparkles, Circle as HelpCircle, Eye } from "lucide-react";
+import { Crown, Plus, Star, Sparkles, HelpCircle, Eye } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 import MonthFilter from "../components/MonthFilter";
 import SortFilter, { SortValue } from "../components/SortFilter";
@@ -57,7 +57,6 @@ const VIPUnknownPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [selectedMonth, setSelectedMonth] = useState("");
   const [sortOption, setSortOption] = useState<SortValue>("mostRecent");
-  const [lastPostDate, setLastPostDate] = useState<string>("");
 
   function decodeModifiedBase64<T>(encodedStr: string): T {
     const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
@@ -90,19 +89,11 @@ const VIPUnknownPage: React.FC = () => {
       const sortOrder = sortOption === "oldest" ? "ASC" : "DESC";
 
       const params = new URLSearchParams({
+        page: page.toString(),
         sortBy: "postDate",
         sortOrder,
-        limit: "50"
+        limit: "300"
       });
-
-      // Para load more, usar cursor baseado na última data
-      if (isLoadMore && lastPostDate) {
-        if (sortOption === "oldest") {
-          params.append("afterDate", lastPostDate);
-        } else {
-          params.append("beforeDate", lastPostDate);
-        }
-      }
 
       if (searchName) params.append("search", searchName);
       if (selectedCategory) params.append("category", selectedCategory);
@@ -136,13 +127,6 @@ const VIPUnknownPage: React.FC = () => {
             (item.category === "Unknown" || item.category === "VIP Unknown")
           );
 
-      // Ordenar por data para garantir ordem cronológica
-      rawData.sort((a, b) => {
-        const dateA = new Date(a.postDate || a.createdAt).getTime();
-        const dateB = new Date(b.postDate || b.createdAt).getTime();
-        return sortOption === "oldest" ? dateA - dateB : dateB - dateA;
-      });
-
       if (isLoadMore) {
         setLinks((prev) => [...prev, ...rawData]);
         setFilteredLinks((prev) => [...prev, ...rawData]);
@@ -150,17 +134,10 @@ const VIPUnknownPage: React.FC = () => {
         setLinks(rawData);
         setFilteredLinks(rawData);
         setCurrentPage(1);
-        setLastPostDate("");
-      }
-
-      // Atualizar a última data para próximo load more
-      if (rawData.length > 0) {
-        const lastItem = rawData[rawData.length - 1];
-        setLastPostDate(lastItem.postDate || lastItem.createdAt);
       }
 
       setTotalPages(totalPages);
-      const hasMore = rawData.length >= 50; // Se retornou o limite, pode haver mais
+      const hasMore = page < totalPages && rawData.length > 0;
       setHasMoreContent(hasMore);
 
       const uniqueCategories = Array.from(new Set(rawData.map((item) => item.category))).map(
@@ -189,7 +166,6 @@ const VIPUnknownPage: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setHasMoreContent(true);
-      setLastPostDate("");
       fetchContent(1);
     }, 300);
 
@@ -197,8 +173,10 @@ const VIPUnknownPage: React.FC = () => {
   }, [searchName, selectedCategory, selectedRegion, selectedMonth, dateFilter, sortOption]);
 
   const handleLoadMore = () => {
-    if (loadingMore || !hasMoreContent) return;
-    fetchContent(1, true);
+    if (loadingMore || !hasMoreContent || currentPage >= totalPages) return;
+    const nextPage = currentPage + 1;
+    setCurrentPage(nextPage);
+    fetchContent(nextPage, true);
   };
 
   const recentLinks = filteredLinks.slice(0, 5);
