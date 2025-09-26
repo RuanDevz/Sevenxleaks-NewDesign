@@ -84,7 +84,7 @@ const AsianPage: React.FC = () => {
         page: page.toString(),
         sortBy: "postDate",
         sortOrder: "DESC",
-        limit: "300"
+        days: '30'
       });
 
       if (searchName) params.append("search", searchName);

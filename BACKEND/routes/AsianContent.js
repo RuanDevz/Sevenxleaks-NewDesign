@@ -88,101 +88,56 @@ router.post('/', verifyToken, isAdmin, async (req, res) => {
 // ===== GET with search =====
 router.get('/search', async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 300; // pode manter para paginação interna
     const offset = (page - 1) * limit;
 
-    const { search, category, month, region, sortBy = 'postDate', sortOrder = 'DESC' } = req.query;
+    const {
+      search, category, month, region,
+      sortBy = 'postDate', sortOrder = 'DESC',
+      days = ''
+    } = req.query;
 
-    let allResults = [];
+    const baseWhere = {};
+    if (search) baseWhere.name = { [Op.iLike]: `%${search}%` };
+    if (category) baseWhere.category = category;
+    if (region) baseWhere.region = region;
 
-    if (search) {
-      const searchWhere = { name: { [Op.iLike]: `%${search}%` } };
-
-      if (month) {
-        searchWhere.postDate = {
-          [Op.and]: [
-            Sequelize.where(
-              Sequelize.fn('EXTRACT', Sequelize.literal('MONTH FROM "postDate"')),
-              month
-            )
-          ]
-        };
-      }
-      if (category) searchWhere.category = category;
-      if (region) searchWhere.region = region;
-
-      const commonOpts = {
-        where: searchWhere,
-        order: [[sortBy, sortOrder]],
-        raw: true
-      };
-
-      const [asianResults, westernResults, bannedResults, unknownResults, vipResults] = await Promise.all([
-        AsianContent.findAll(commonOpts),
-        WesternContent.findAll(commonOpts),
-        BannedContent.findAll(commonOpts),
-        UnknownContent.findAll(commonOpts),
-        Vip.findAll(commonOpts)
-      ]);
-
-      const withType = (rows, type) => rows.map(item => ({ ...item, contentType: type }));
-
-      allResults = [
-        ...withType(asianResults, 'asian'),
-        ...withType(westernResults, 'western'),
-        ...withType(bannedResults, 'banned'),
-        ...withType(unknownResults, 'unknown'),
-        ...withType(vipResults, 'vip')
-      ];
-
-      allResults.sort((a, b) => {
-        const dateA = new Date(a.postDate);
-        const dateB = new Date(b.postDate);
-        return sortOrder === 'DESC' ? dateB.getTime() - dateA.getTime() : dateA.getTime() - dateB.getTime();
-      });
-    } else {
-      const where = {};
-      if (category) where.category = category;
-      if (region) where.region = region;
-      if (month) {
-        where.postDate = {
-          [Op.and]: [
-            Sequelize.where(
-              Sequelize.fn('EXTRACT', Sequelize.literal('MONTH FROM "postDate"')),
-              month
-            )
-          ]
-        };
-      }
-
-      const results = await AsianContent.findAll({
-        where,
-        order: [[sortBy, sortOrder]],
-        raw: true
-      });
-
-      allResults = results.map(item => ({ ...item, contentType: 'asian' }));
+    // PRIORIZE "days" sobre "month"
+    if (days) {
+      const n = Math.max(1, Number(days));
+      const end = new Date();                          // agora
+      const start = new Date(end);                     // agora - n dias, zerando para 00:00Z
+      start.setUTCDate(start.getUTCDate() - n);
+      start.setUTCHours(0, 0, 0, 0);
+      baseWhere.postDate = { [Op.gte]: start, [Op.lte]: end };
+    } else if (month) {
+      const y = new Date().getUTCFullYear();
+      const m = Number(month);
+      const start = new Date(Date.UTC(y, m - 1, 1));
+      const end   = new Date(Date.UTC(y, m, 1));
+      baseWhere.postDate = { [Op.gte]: start, [Op.lt]: end };
     }
 
+    const commonOpts = { where: baseWhere, order: [[sortBy, sortOrder]], raw: true };
+
+    // consulte as coleções necessárias (exemplo mantendo apenas asian; ajuste conforme seu caso)
+    const asian = await AsianContent.findAll(commonOpts).then(r => r.map(x => ({ ...x, contentType: 'asian' })));
+    let allResults = asian;
+
+    // ordene e pagine SOBRE o subconjunto dos últimos n dias
+    allResults.sort((a, b) => new Date(sortOrder === 'DESC' ? b.postDate : a.postDate) - new Date(sortOrder === 'DESC' ? a.postDate : b.postDate));
     const total = allResults.length;
-    const paginatedResults = allResults.slice(offset, offset + limit);
+    const data = allResults.slice(offset, offset + limit);
 
-    const payload = {
-      page,
-      perPage: limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-      data: paginatedResults
-    };
-
-    const encodedPayload = encodePayloadToBase64(payload);
+    const payload = { page, perPage: limit, total, totalPages: Math.ceil(total / limit), data };
+    const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64');
     return res.status(200).json({ data: encodedPayload });
-
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar conteúdos: ' + error.message });
+    return res.status(500).json({ error: 'Erro ao buscar conteúdos: ' + error.message });
   }
 });
+
 
 // ===== GET all =====
 router.get('/', async (req, res) => {
