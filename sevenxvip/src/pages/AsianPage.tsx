@@ -50,6 +50,14 @@ const getPath = (l: LinkItem) => {
   return `/western/${l.slug}`;
 };
 
+function decodeModifiedBase64<T>(encodedStr: string): T {
+  const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
+  const jsonString = atob(fixedBase64);
+  return JSON.parse(jsonString) as T;
+}
+
+const LIMIT = 300;
+
 const AsianPage: React.FC = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
@@ -61,21 +69,17 @@ const AsianPage: React.FC = () => {
   const [searchName, setSearchName] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [hasMoreContent, setHasMoreContent] = useState(true);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [totalPages, setTotalPages] = useState(1);
   const [selectedMonth, setSelectedMonth] = useState("");
 
-  const loaderRef = useRef<HTMLDivElement | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
 
-  function decodeModifiedBase64<T>(encodedStr: string): T {
-    const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
-    const jsonString = atob(fixedBase64);
-    return JSON.parse(jsonString) as T;
-  }
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasMoreContent, setHasMoreContent] = useState(true);
+
+  const loaderRef = useRef<HTMLDivElement | null>(null);
 
   const fetchContent = async (page: number, isLoadMore = false) => {
     try {
@@ -83,11 +87,16 @@ const AsianPage: React.FC = () => {
       if (isLoadMore) setLoadingMore(true);
       setSearchLoading(true);
 
+      const isGlobalSearch = Boolean(searchName?.trim());
+      const baseUrl = isGlobalSearch
+        ? `${import.meta.env.VITE_BACKEND_URL}/universal-search/search`
+        : `${import.meta.env.VITE_BACKEND_URL}/asian/search`;
+
       const params = new URLSearchParams({
-        page: page.toString(),
+        page: String(page),
         sortBy: "postDate",
         sortOrder: "DESC",
-        limit: "300",
+        limit: String(LIMIT),
       });
 
       if (searchName) params.append("search", searchName);
@@ -95,56 +104,48 @@ const AsianPage: React.FC = () => {
       if (selectedMonth) params.append("month", selectedMonth);
       if (dateFilter !== "all") params.append("dateFilter", dateFilter);
 
-      const response = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/universal-search/search?${params}`,
-        {
-          headers: {
-            "x-api-key": `${import.meta.env.VITE_FRONTEND_API_KEY}`,
-          },
-        }
-      );
+      const response = await axios.get(`${baseUrl}?${params.toString()}`, {
+        headers: { "x-api-key": `${import.meta.env.VITE_FRONTEND_API_KEY}` },
+      });
 
       if (!response.data?.data) throw new Error("Invalid server response");
 
       const decoded = decodeModifiedBase64<{
-        data: LinkItem[];
+        page: number;
+        perPage: number;
+        total: number;
         totalPages: number;
+        data: LinkItem[];
       }>(response.data.data);
 
-      const { data: allData, totalPages } = decoded;
+      const { data, totalPages } = decoded;
 
-      const rawData = searchName
-        ? allData.filter(
-            (item) => !item.contentType || !item.contentType.startsWith("vip")
-          )
-        : allData.filter((item) => item.contentType === "asian");
+      // Em busca global: remover apenas VIP. Em Asian: já vem apenas Asian.
+      const pageData = isGlobalSearch
+        ? data.filter((i) => !i.contentType || !i.contentType.startsWith("vip"))
+        : data;
 
       if (isLoadMore) {
-        setLinks((prev) => [...prev, ...rawData]);
-        setFilteredLinks((prev) => [...prev, ...rawData]);
+        const merged = [...links, ...pageData];
+        setLinks(merged);
+        setFilteredLinks(merged);
       } else {
-        setLinks(rawData);
-        setFilteredLinks(rawData);
+        setLinks(pageData);
+        setFilteredLinks(pageData);
         setCurrentPage(1);
       }
 
       setTotalPages(totalPages);
-      const hasMore = page < totalPages && rawData.length > 0;
-      setHasMoreContent(hasMore);
+      setHasMoreContent(page < totalPages && pageData.length > 0);
 
-      const uniqueCategories = Array.from(
-        new Set(rawData.map((item) => item.category))
-      ).map((category) => ({ id: category, name: category, category }));
-
-      setCategories((prev) => {
-        const existingCategories = new Set(prev.map((c) => c.category));
-        const newCategories = uniqueCategories.filter(
-          (c) => !existingCategories.has(c.category)
-        );
-        return [...prev, ...newCategories];
-      });
-    } catch (error) {
-      console.error("Error fetching content:", error);
+      // Categorias a partir do conjunto acumulado
+      const allForCats = isLoadMore ? [...links, ...pageData] : pageData;
+      const uniqCats = Array.from(new Set(allForCats.map((i) => i.category))).map(
+        (c) => ({ id: c, name: c, category: c })
+      );
+      setCategories(uniqCats);
+    } catch (err) {
+      console.error("Error fetching content:", err);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -160,16 +161,17 @@ const AsianPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchName, selectedCategory, dateFilter, selectedMonth]);
 
+  // Scroll infinito
   useEffect(() => {
     if (!hasMoreContent || loadingMore) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          const nextPage = currentPage + 1;
-          if (nextPage <= totalPages) {
-            setCurrentPage(nextPage);
-            fetchContent(nextPage, true);
+          const next = currentPage + 1;
+          if (next <= totalPages) {
+            setCurrentPage(next);
+            fetchContent(next, true);
           }
         }
       },
@@ -178,7 +180,6 @@ const AsianPage: React.FC = () => {
 
     const node = loaderRef.current;
     if (node) observer.observe(node);
-
     return () => {
       if (node) observer.unobserve(node);
     };
@@ -193,10 +194,11 @@ const AsianPage: React.FC = () => {
       month: "long",
       day: "2-digit",
     });
+    // Nota: datas são exibidas por grupo; backend já ordena por postDate DESC.
   };
 
   const groupPostsByDate = (posts: LinkItem[]) => {
-    const grouped: { [key: string]: LinkItem[] } = {};
+    const grouped: Record<string, LinkItem[]> = {};
     posts.forEach((post) => {
       const dateKey = formatDateHeader(post.postDate || post.createdAt);
       if (!grouped[dateKey]) grouped[dateKey] = [];
@@ -224,31 +226,21 @@ const AsianPage: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 relative z-[60]">
         <div
           className={`backdrop-blur-xl border rounded-3xl p-6 shadow-2xl ${
-            isDark
-              ? "bg-gray-800/60 border-gray-700/50"
-              : "bg-white/80 border-gray-200/50"
+            isDark ? "bg-gray-800/60 border-gray-700/50" : "bg-white/80 border-gray-200/50"
           }`}
         >
           <div
             className={`flex flex-col lg:flex-row items-center gap-4 rounded-2xl px-6 py-4 border shadow-inner ${
-              isDark
-                ? "bg-gray-700/50 border-gray-600/30"
-                : "bg-gray-100/50 border-gray-300/30"
+              isDark ? "bg-gray-700/50 border-gray-600/30" : "bg-gray-100/50 border-gray-300/30"
             }`}
           >
             {/* Search Bar */}
             <div className="flex items-center gap-3 flex-1 min-w-0">
-              <i
-                className={`fa-solid fa-search text-lg ${
-                  isDark ? "text-purple-400" : "text-purple-600"
-                }`}
-              ></i>
+              <i className={`fa-solid fa-search text-lg ${isDark ? "text-purple-400" : "text-purple-600"}`}></i>
               <input
                 type="text"
                 className={`flex-1 bg-transparent border-none outline-none text-lg ${
-                  isDark
-                    ? "text-white placeholder-gray-400"
-                    : "text-gray-900 placeholder-gray-500"
+                  isDark ? "text-white placeholder-gray-400" : "text-gray-900 placeholder-gray-500"
                 }`}
                 placeholder="Search by name..."
                 value={searchName}
@@ -279,21 +271,13 @@ const AsianPage: React.FC = () => {
                   }`}
                   onClick={() => setDateFilter(filter)}
                 >
-                  {filter === "all"
-                    ? "All"
-                    : filter === "7days"
-                    ? "7 Days"
-                    : filter.charAt(0).toUpperCase() + filter.slice(1)}
+                  {filter === "all" ? "All" : filter === "7days" ? "7 Days" : filter.charAt(0).toUpperCase() + filter.slice(1)}
                 </button>
               ))}
             </div>
 
             <div className="flex items-center gap-2 month-filter-container relative z-50">
-              <MonthFilter
-                selectedMonth={selectedMonth}
-                onMonthChange={setSelectedMonth}
-                themeColor="purple"
-              />
+              <MonthFilter selectedMonth={selectedMonth} onMonthChange={setSelectedMonth} themeColor="purple" />
             </div>
 
             {/* Category Select */}
@@ -335,25 +319,18 @@ const AsianPage: React.FC = () => {
           ) : filteredLinks.length > 0 ? (
             <>
               {Object.entries(groupedLinks)
-                .sort(
-                  ([dateA], [dateB]) =>
-                    new Date(dateB).getTime() - new Date(dateA).getTime()
-                )
+                .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
                 .map(([date, posts]) => (
                   <div key={date} className="mb-8">
                     <h2
                       className={`text-xl font-bold mb-4 pb-2 border-b font-orbitron flex items-center gap-3 ${
-                        isDark
-                          ? "text-gray-300 border-gray-700/50"
-                          : "text-gray-700 border-gray-300/50"
+                        isDark ? "text-gray-300 border-gray-700/50" : "text-gray-700 border-gray-300/50"
                       }`}
                     >
                       <div className="w-3 h-8 bg-gradient-to-b from-purple-500 to-purple-600 rounded-full shadow-lg shadow-purple-500/30"></div>
                       <span
                         className={`bg-clip-text text-transparent ${
-                          posts.every(
-                            (p) => (p.contentType || "asian") === "asian"
-                          )
+                          posts.every((p) => (p.contentType || "asian") === "asian")
                             ? isDark
                               ? "bg-gradient-to-r from-purple-400 to-purple-300"
                               : "bg-gradient-to-r from-purple-600 to-purple-500"
@@ -374,12 +351,7 @@ const AsianPage: React.FC = () => {
                             new Date(a.postDate || a.createdAt).getTime()
                         )
                         .map((link, index) => (
-                          <Link
-                            key={link.id}
-                            to={getPath(link)}
-                            className="relative block rounded-xl p-1 focus:outline-none"
-                            draggable={false}
-                          >
+                          <Link key={link.id} to={getPath(link)} className="relative block rounded-xl p-1 focus:outline-none" draggable={false}>
                             <motion.div
                               initial={{ opacity: 0, y: 20 }}
                               animate={{ opacity: 1, y: 0 }}
@@ -411,9 +383,7 @@ const AsianPage: React.FC = () => {
                                   )}
                                   <h3
                                     className={`text-sm sm:text-lg font-bold transition-colors duration-300 font-orbitron relative truncate ${
-                                      isDark
-                                        ? "text-white group-hover:text-purple-300"
-                                        : "text-gray-900 group-hover:text-purple-600"
+                                      isDark ? "text-white group-hover:text-purple-300" : "text-gray-900 group-hover:text-purple-600"
                                     }`}
                                   >
                                     {link.name}
@@ -421,9 +391,7 @@ const AsianPage: React.FC = () => {
                                   </h3>
                                   <div
                                     className={`hidden sm:block h-px bg-gradient-to-r to-transparent flex-1 max-w-20 transition-all duration-300 ${
-                                      isDark
-                                        ? "from-purple-500/50 group-hover:from-purple-400/70"
-                                        : "from-purple-400/50 group-hover:from-purple-500/70"
+                                      isDark ? "from-purple-500/50 group-hover:from-purple-400/70" : "from-purple-400/50 group-hover:from-purple-500/70"
                                     }`}
                                   ></div>
                                 </div>
@@ -431,9 +399,7 @@ const AsianPage: React.FC = () => {
                                   {recentLinks.includes(link) && (
                                     <span
                                       className={`inline-flex items-center px-2 sm:px-4 py-1 sm:py-2 text-white text-xs font-bold rounded-full shadow-lg animate-pulse border font-roboto ${
-                                        isDark
-                                          ? "bg-gradient-to-r from-purple-500 to-purple-600 border-purple-400/30"
-                                          : "bg-gradient-to-r from-purple-600 to-purple-700 border-purple-500/30"
+                                        isDark ? "bg-gradient-to-r from-purple-500 to-purple-600 border-purple-400/30" : "bg-gradient-to-r from-purple-600 to-purple-700 border-purple-500/30"
                                       }`}
                                     >
                                       <i className="fa-solid fa-star mr-1 text-xs hidden sm:inline"></i>
@@ -442,9 +408,7 @@ const AsianPage: React.FC = () => {
                                   )}
                                   <span
                                     className={`inline-flex items-center px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm font-medium rounded-full border backdrop-blur-sm font-roboto ${
-                                      isDark
-                                        ? "bg-gray-700/70 text-gray-300 border-gray-600/50"
-                                        : "bg-gray-200/70 text-gray-700 border-gray-300/50"
+                                      isDark ? "bg-gray-700/70 text-gray-300 border-gray-600/50" : "bg-gray-200/70 text-gray-700 border-gray-300/50"
                                     }`}
                                   >
                                     <i className="fa-solid fa-tag mr-1 sm:mr-2 text-xs"></i>
@@ -464,7 +428,7 @@ const AsianPage: React.FC = () => {
                   {loadingMore && (
                     <div className="w-8 h-8 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin"></div>
                   )}
-                                </div>
+                </div>
               )}
             </>
           ) : (
@@ -472,21 +436,8 @@ const AsianPage: React.FC = () => {
               <div className="mb-8">
                 <i className="fa-solid fa-search text-6xl text-gray-500"></i>
               </div>
-              <h3
-                className={`text-3xl font-bold mb-4 font-orbitron ${
-                  isDark ? "text-white" : "text-gray-900"
-                }`}
-              >
-                No Content Found
-              </h3>
-              <p
-                className={`text-lg font-roboto ${
-                  isDark ? "text-gray-400" : "text-gray-600"
-                }`}
-              >
-                Try adjusting your search or filters to find what you're looking
-                for.
-              </p>
+              <h3 className={`text-3xl font-bold mb-4 font-orbitron ${isDark ? "text-white" : "text-gray-900"}`}>No Content Found</h3>
+              <p className={`text-lg font-roboto ${isDark ? "text-gray-400" : "text-gray-600"}`}>Try adjusting your search or filters to find what you're looking for.</p>
             </div>
           )}
         </main>
