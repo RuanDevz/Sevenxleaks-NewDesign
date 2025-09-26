@@ -1,5 +1,5 @@
 // src/pages/AsianPage.tsx
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -50,36 +50,29 @@ const getPath = (l: LinkItem) => {
   return `/western/${l.slug}`;
 };
 
-function decodeModifiedBase64<T>(encodedStr: string): T {
-  const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
-  const jsonString = atob(fixedBase64);
-  return JSON.parse(jsonString) as T;
-}
-
-const LIMIT = 300;
-
 const AsianPage: React.FC = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isDark = theme === "dark";
-
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [filteredLinks, setFilteredLinks] = useState<LinkItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchName, setSearchName] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
-  const [selectedMonth, setSelectedMonth] = useState("");
-
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
-
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [hasMoreContent, setHasMoreContent] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedMonth, setSelectedMonth] = useState("");
 
-  const loaderRef = useRef<HTMLDivElement | null>(null);
+  function decodeModifiedBase64<T>(encodedStr: string): T {
+    const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
+    const jsonString = atob(fixedBase64);
+    return JSON.parse(jsonString) as T;
+  }
 
   const fetchContent = async (page: number, isLoadMore = false) => {
     try {
@@ -87,16 +80,11 @@ const AsianPage: React.FC = () => {
       if (isLoadMore) setLoadingMore(true);
       setSearchLoading(true);
 
-      const isGlobalSearch = Boolean(searchName?.trim());
-      const baseUrl = isGlobalSearch
-        ? `${import.meta.env.VITE_BACKEND_URL}/universal-search/search`
-        : `${import.meta.env.VITE_BACKEND_URL}/asian/search`;
-
       const params = new URLSearchParams({
-        page: String(page),
+        page: page.toString(),
         sortBy: "postDate",
         sortOrder: "DESC",
-        limit: String(LIMIT),
+        limit: "300"
       });
 
       if (searchName) params.append("search", searchName);
@@ -104,54 +92,58 @@ const AsianPage: React.FC = () => {
       if (selectedMonth) params.append("month", selectedMonth);
       if (dateFilter !== "all") params.append("dateFilter", dateFilter);
 
-      const response = await axios.get(`${baseUrl}?${params.toString()}`, {
-        headers: { "x-api-key": `${import.meta.env.VITE_FRONTEND_API_KEY}` },
-      });
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/universal-search/search?${params}`,
+        {
+          headers: {
+            "x-api-key": `${import.meta.env.VITE_FRONTEND_API_KEY}`,
+          },
+        }
+      );
 
       if (!response.data?.data) throw new Error("Invalid server response");
 
-      const decoded = decodeModifiedBase64<{
-        page: number;
-        perPage: number;
-        total: number;
-        totalPages: number;
-        data: LinkItem[];
-      }>(response.data.data);
+      const decoded = decodeModifiedBase64<{ data: LinkItem[]; totalPages: number }>(
+        response.data.data
+      );
 
-      const { data, totalPages } = decoded;
+      const { data: allData, totalPages } = decoded;
 
-      // Em busca global: remover apenas VIP. Em Asian: já vem apenas Asian.
-      const pageData = isGlobalSearch
-        ? data.filter((i) => !i.contentType || !i.contentType.startsWith("vip"))
-        : data;
+      const rawData = searchName
+        ? allData.filter((item) => !item.contentType || !item.contentType.startsWith("vip"))
+        : allData.filter((item) => item.contentType === "asian");
 
       if (isLoadMore) {
-        const merged = [...links, ...pageData];
-        setLinks(merged);
-        setFilteredLinks(merged);
+        setLinks((prev) => [...prev, ...rawData]);
+        setFilteredLinks((prev) => [...prev, ...rawData]);
       } else {
-        setLinks(pageData);
-        setFilteredLinks(pageData);
+        setLinks(rawData);
+        setFilteredLinks(rawData);
         setCurrentPage(1);
       }
 
       setTotalPages(totalPages);
-      setHasMoreContent(page < totalPages && pageData.length > 0);
+      const hasMore = page < totalPages && rawData.length > 0;
+      setHasMoreContent(hasMore);
 
-      // Categorias a partir do conjunto acumulado
-      const allForCats = isLoadMore ? [...links, ...pageData] : pageData;
-      const uniqCats = Array.from(new Set(allForCats.map((i) => i.category))).map(
-        (c) => ({ id: c, name: c, category: c })
+      const uniqueCategories = Array.from(new Set(rawData.map((item) => item.category))).map(
+        (category) => ({ id: category, name: category, category })
       );
-      setCategories(uniqCats);
-    } catch (err) {
-      console.error("Error fetching content:", err);
+
+      setCategories((prev) => {
+        const existingCategories = new Set(prev.map((c) => c.category));
+        const newCategories = uniqueCategories.filter((c) => !existingCategories.has(c.category));
+        return [...prev, ...newCategories];
+      });
+    } catch (error) {
+      console.error("Error fetching content:", error);
     } finally {
       setLoading(false);
       setLoadingMore(false);
       setSearchLoading(false);
     }
   };
+
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -161,29 +153,12 @@ const AsianPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchName, selectedCategory, dateFilter, selectedMonth]);
 
-  // Scroll infinito
-  useEffect(() => {
-    if (!hasMoreContent || loadingMore) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          const next = currentPage + 1;
-          if (next <= totalPages) {
-            setCurrentPage(next);
-            fetchContent(next, true);
-          }
-        }
-      },
-      { rootMargin: "200px" }
-    );
-
-    const node = loaderRef.current;
-    if (node) observer.observe(node);
-    return () => {
-      if (node) observer.unobserve(node);
-    };
-  }, [currentPage, totalPages, hasMoreContent, loadingMore]);
+  const handleLoadMore = () => {
+    if (loadingMore || !hasMoreContent || currentPage >= totalPages) return;
+    const nextPage = currentPage + 1;
+    setCurrentPage(nextPage);
+    fetchContent(nextPage, true);
+  };
 
   const recentLinks = filteredLinks.slice(0, 5);
 
@@ -194,11 +169,10 @@ const AsianPage: React.FC = () => {
       month: "long",
       day: "2-digit",
     });
-    // Nota: datas são exibidas por grupo; backend já ordena por postDate DESC.
   };
 
   const groupPostsByDate = (posts: LinkItem[]) => {
-    const grouped: Record<string, LinkItem[]> = {};
+    const grouped: { [key: string]: LinkItem[] } = {};
     posts.forEach((post) => {
       const dateKey = formatDateHeader(post.postDate || post.createdAt);
       if (!grouped[dateKey]) grouped[dateKey] = [];
@@ -319,7 +293,7 @@ const AsianPage: React.FC = () => {
           ) : filteredLinks.length > 0 ? (
             <>
               {Object.entries(groupedLinks)
-                .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
+                .sort(([dateA], [dateB]) => new Date(dateB).getTime() - new Date(dateA).getTime())
                 .map(([date, posts]) => (
                   <div key={date} className="mb-8">
                     <h2
@@ -344,90 +318,98 @@ const AsianPage: React.FC = () => {
                     </h2>
 
                     <div className="space-y-2">
-                      {posts
-                        .sort(
-                          (a, b) =>
-                            new Date(b.postDate || b.createdAt).getTime() -
-                            new Date(a.postDate || a.createdAt).getTime()
-                        )
-                        .map((link, index) => (
-                          <Link key={link.id} to={getPath(link)} className="relative block rounded-xl p-1 focus:outline-none" draggable={false}>
-                            <motion.div
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: index * 0.05 }}
-                              className={`group rounded-xl p-3 transition-all duration-300 cursor-pointer backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-[1.01] border ${
-                                isDark
-                                  ? "bg-gray-800/60 hover:bg-gray-700/80 border-gray-700/50 hover:border-purple-500/50 hover:shadow-purple-500/10"
-                                  : "bg-white/60 hover:bg-gray-50/80 border-gray-200/50 hover:border-purple-400/50 hover:shadow-purple-400/10"
-                              }`}
-                            >
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-                                  {link.contentType && (
-                                    <div
-                                      className={`w-2 h-2 rounded-full ${
-                                        link.contentType === "asian"
-                                          ? "bg-purple-400"
-                                          : link.contentType === "banned"
-                                          ? "bg-red-400"
-                                          : link.contentType === "unknown"
-                                          ? "bg-gray-400"
-                                          : link.contentType === "western"
-                                          ? "bg-orange-400"
-                                          : link.contentType === "vip"
-                                          ? "bg-yellow-400"
-                                          : "bg-purple-400"
-                                      }`}
-                                    ></div>
-                                  )}
-                                  <h3
-                                    className={`text-sm sm:text-lg font-bold transition-colors duration-300 font-orbitron relative truncate ${
-                                      isDark ? "text-white group-hover:text-purple-300" : "text-gray-900 group-hover:text-purple-600"
-                                    }`}
-                                  >
-                                    {link.name}
-                                    <div className="absolute -bottom-1 left-0 w-16 h-0.5 bg-gradient-to-r from-purple-500 to-purple-300 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                                  </h3>
-                                  <div
-                                    className={`hidden sm:block h-px bg-gradient-to-r to-transparent flex-1 max-w-20 transition-all duration-300 ${
-                                      isDark ? "from-purple-500/50 group-hover:from-purple-400/70" : "from-purple-400/50 group-hover:from-purple-500/70"
-                                    }`}
-                                  ></div>
-                                </div>
-                                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                                  {recentLinks.includes(link) && (
-                                    <span
-                                      className={`inline-flex items-center px-2 sm:px-4 py-1 sm:py-2 text-white text-xs font-bold rounded-full shadow-lg animate-pulse border font-roboto ${
-                                        isDark ? "bg-gradient-to-r from-purple-500 to-purple-600 border-purple-400/30" : "bg-gradient-to-r from-purple-600 to-purple-700 border-purple-500/30"
-                                      }`}
-                                    >
-                                      <i className="fa-solid fa-star mr-1 text-xs hidden sm:inline"></i>
-                                      NEW
-                                    </span>
-                                  )}
-                                  <span
-                                    className={`inline-flex items-center px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm font-medium rounded-full border backdrop-blur-sm font-roboto ${
-                                      isDark ? "bg-gray-700/70 text-gray-300 border-gray-600/50" : "bg-gray-200/70 text-gray-700 border-gray-300/50"
-                                    }`}
-                                  >
-                                    <i className="fa-solid fa-tag mr-1 sm:mr-2 text-xs"></i>
-                                    {link.category}
-                                  </span>
-                                </div>
-                              </div>
-                            </motion.div>
-                          </Link>
-                        ))}
-                    </div>
-                  </div>
-                ))}
+                                          {posts
+                                            .sort((a, b) => new Date(b.postDate || b.createdAt).getTime() - new Date(a.postDate || a.createdAt).getTime())
+                                            .map((link, index) => (
+                                           <Link to={getPath(link)}
+                                                  className="relative block rounded-xl p-1 focus:outline-none"
+                                            draggable={false}>
+                                            <motion.div
+                                              key={link.id}
+                                              initial={{ opacity: 0, y: 20 }}
+                                              animate={{ opacity: 1, y: 0 }}
+                                              transition={{ delay: index * 0.05 }}
+                                              className={`group rounded-xl p-3 transition-all duration-300 cursor-pointer backdrop-blur-sm shadow-lg hover:shadow-xl transform hover:scale-[1.01] border ${
+                                                isDark 
+                                                  ? 'bg-gray-800/60 hover:bg-gray-700/80 border-gray-700/50 hover:border-purple-500/50 hover:shadow-purple-500/10'
+                                                  : 'bg-white/60 hover:bg-gray-50/80 border-gray-200/50 hover:border-purple-400/50 hover:shadow-purple-400/10'
+                                              } border`}
+                                            >
+                                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                                <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                                                  {link.contentType &&(
+                                                    <div className={`w-2 h-2 rounded-full ${
+                                                      link.contentType === 'asian' ? 'bg-purple-400' :
+                                                      link.contentType === 'banned' ? 'bg-red-400' :
+                                                      link.contentType === 'unknown' ? 'bg-gray-400' :
+                                                      link.contentType === 'western' ? 'bg-orange-400' :
+                                                      link.contentType === 'vip' ? 'bg-yellow-400' : 'bg-purple-400'
+                                                    }`}></div>
+                                                  )}
+                                                  <h3 className={`text-sm sm:text-lg font-bold transition-colors duration-300 font-orbitron relative truncate ${
+                                                    isDark ? 'text-white group-hover:text-purple-300' : 'text-gray-900 group-hover:text-purple-600'
+                                                  }`}>
+                                                    {link.name}
+                                                    <div className="absolute -bottom-1 left-0 w-16 h-0.5 bg-gradient-to-r from-purple-500 to-purple-300 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                                  </h3>
+                                                  <div className={`hidden sm:block h-px bg-gradient-to-r to-transparent flex-1 max-w-20 transition-all duration-300 ${
+                                                    isDark 
+                                                      ? 'from-purple-500/50 group-hover:from-purple-400/70'
+                                                      : 'from-purple-400/50 group-hover:from-purple-500/70'
+                                                  }`}></div>
+                                                </div>
+                                                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                                                  {recentLinks.includes(link) && (
+                                                    <span className={`inline-flex items-center px-2 sm:px-4 py-1 sm:py-2 text-white text-xs font-bold rounded-full shadow-lg animate-pulse border font-roboto ${
+                                                      isDark 
+                                                        ? 'bg-gradient-to-r from-purple-500 to-purple-600 border-purple-400/30'
+                                                        : 'bg-gradient-to-r from-purple-600 to-purple-700 border-purple-500/30'
+                                                    }`}>
+                                                      <i className="fa-solid fa-star mr-1 text-xs hidden sm:inline"></i>
+                                                      NEW
+                                                    </span>
+                                                  )}
+                                                  <span className={`inline-flex items-center px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm font-medium rounded-full border backdrop-blur-sm font-roboto ${
+                                                    isDark 
+                                                      ? 'bg-gray-700/70 text-gray-300 border-gray-600/50'
+                                                      : 'bg-gray-200/70 text-gray-700 border-gray-300/50'
+                                                  }`}>
+                                                    <i className="fa-solid fa-tag mr-1 sm:mr-2 text-xs"></i>
+                                                    {link.category}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                            </motion.div>
+                                           </Link>
+                                            ))}
+                                        </div>
+                                      </div>
+                                    ))}
 
               {hasMoreContent && (
-                <div ref={loaderRef} className="flex justify-center py-8">
-                  {loadingMore && (
-                    <div className="w-8 h-8 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin"></div>
-                  )}
+                <div className="text-center mt-12 py-8">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className={`px-8 py-4 rounded-xl font-bold text-lg transition-all duration-300 ${
+                      loadingMore
+                        ? 'bg-gray-600 cursor-not-allowed'
+                        : isDark
+                          ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 shadow-lg hover:shadow-purple-500/30'
+                          : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 shadow-lg hover:shadow-purple-500/20'
+                    } text-white`}
+                  >
+                    {loadingMore ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block mr-2" />
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More Content'
+                    )}
+                  </motion.button>
                 </div>
               )}
             </>
