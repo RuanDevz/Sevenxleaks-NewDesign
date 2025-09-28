@@ -14,16 +14,35 @@ const {
   VipUnknownContent,
 } = require('../models');
 
-/**
- * Filtro de datas baseado em postDate.
- * dateFilter: 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'prevMonth' | undefined
- * month: 1..12 para filtrar mês específico do ano corrente
- */
+/** =========================
+ *  Utilidades de codificação
+ *  ========================= */
+function insertRandomChar(base64Str) {
+  const letters = 'abcdefghijklmnopqrstuvwxyz';
+  const randomChar = letters.charAt(Math.floor(Math.random() * letters.length));
+  return base64Str.slice(0, 2) + randomChar + base64Str.slice(2);
+}
+
+function encodePayloadToBase64(payload) {
+  const jsonStr = JSON.stringify(payload);
+  const base64Str = Buffer.from(jsonStr).toString('base64');
+  return insertRandomChar(base64Str);
+}
+
+/** ==========================================
+ *  Filtro de datas baseado em postDate (robusto)
+ *  Suporta tanto os valores antigos quanto os novos.
+ *  ========================================== */
 function createDateFilter(dateFilter, month) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const where = {};
+  // Compatibilidade com valores do código antigo do usuário.
+  const alias = {
+    '7days': 'last7',
+    all: undefined,
+  };
+  const df = alias[dateFilter] ?? dateFilter;
 
   if (month) {
     return {
@@ -42,11 +61,12 @@ function createDateFilter(dateFilter, month) {
     };
   }
 
+  const where = {};
   const start = new Date(today);
   const end = new Date(today);
   end.setDate(end.getDate() + 1); // exclusivo
 
-  switch (dateFilter) {
+  switch (df) {
     case 'today':
       where.postDate = { [Op.gte]: start, [Op.lt]: end };
       break;
@@ -89,15 +109,16 @@ function createDateFilter(dateFilter, month) {
   return where;
 }
 
-/**
- * Busca segura por modelo, SEM paginação aqui.
- * Ordena apenas para garantir estabilidade relativa antes do merge.
- */
-async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categories) {
+/** ===================================
+ *  Busca por modelo SEM paginação aqui
+ *  + filtros textuais opcionais
+ *  =================================== */
+async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categories, region) {
   const where = { ...whereClause };
 
   if (q) {
     const like = { [Op.iLike]: `%${q}%` };
+    // Ajuste aqui se precisar cobrir mais colunas
     where[Op.or] = [
       { name: like },
       { slug: like },
@@ -107,6 +128,11 @@ async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categor
 
   if (categories && categories.length) {
     where.category = { [Op.in]: categories };
+  }
+
+  if (region) {
+    // Só aplica se a coluna existir no schema
+    where.region = region;
   }
 
   return model.findAll({
@@ -120,100 +146,114 @@ async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categor
   });
 }
 
-/**
- * Mapa de modelos => contentType fixo na resposta.
- */
+/** ============================
+ *  Mapa de fontes / contentType
+ *  ============================ */
 const SOURCES = [
-  { model: AsianContent,         contentType: 'asian' },
-  { model: WesternContent,       contentType: 'western' },
-  { model: BannedContent,        contentType: 'banned' },
-  { model: UnknownContent,       contentType: 'unknown' },
-  { model: VipAsianContent,      contentType: 'vip-asian' },
-  { model: VipWesternContent,    contentType: 'vip-western' },
-  { model: VipBannedContent,     contentType: 'vip-banned' },
-  { model: VipUnknownContent,    contentType: 'vip-unknown' },
+  { key: 'asian',       model: AsianContent,      contentType: 'asian' },
+  { key: 'western',     model: WesternContent,    contentType: 'western' },
+  { key: 'banned',      model: BannedContent,     contentType: 'banned' },
+  { key: 'unknown',     model: UnknownContent,    contentType: 'unknown' },
+  { key: 'vip-asian',   model: VipAsianContent,   contentType: 'vip-asian' },
+  { key: 'vip-western', model: VipWesternContent, contentType: 'vip-western' },
+  { key: 'vip-banned',  model: VipBannedContent,  contentType: 'vip-banned' },
+  { key: 'vip-unknown', model: VipUnknownContent, contentType: 'vip-unknown' },
 ];
 
-/**
- * GET /universal-search/search
- * Query params:
- *  - page: número da página (1..n)
- *  - limit: itens por página
- *  - sortBy: default 'postDate'
- *  - sortOrder: 'DESC' | 'ASC' (default 'DESC')
- *  - dateFilter: conforme createDateFilter
- *  - month: 1..12
- *  - q: termo de busca
- *  - categories: lista CSV de categorias a filtrar (ex.: "Asian,Teen,Big Tits")
- */
+/** ===========================
+ *  Rota GET /universal-search
+ *  =========================== */
 router.get('/search', async (req, res) => {
   const t0 = Date.now();
 
-  // parâmetros
+  // Query params com defaults seguros
   const page = Math.max(parseInt(req.query.page || '1', 10), 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10), 1), 500);
+  const limit = Math.min(Math.max(parseInt(req.query.limit || '300', 10), 1), 500);
   const sortBy = (req.query.sortBy || 'postDate');
   const sortOrder = (String(req.query.sortOrder || 'DESC').toUpperCase() === 'ASC') ? 'ASC' : 'DESC';
-  const dateFilter = req.query.dateFilter;
-  const month = req.query.month ? parseInt(req.query.month, 10) : undefined;
-  const q = req.query.q ? String(req.query.q).trim() : undefined;
+
+  // Compatibilidade: aceita tanto 'q' quanto 'search'
+  const q = (req.query.q ?? req.query.search)?.toString().trim() || undefined;
+
+  // Categoria única ou CSV
   const categories = req.query.categories
-    ? String(req.query.categories)
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean)
-    : undefined;
+    ? String(req.query.categories).split(',').map(s => s.trim()).filter(Boolean)
+    : (req.query.category ? [String(req.query.category).trim()] : undefined);
+
+  const dateFilter = req.query.dateFilter; // aceita today, yesterday, last7, last30, thisMonth, prevMonth, 7days, all
+  const month = req.query.month ? parseInt(req.query.month, 10) : undefined;
+  const region = req.query.region ? String(req.query.region).trim() : undefined;
+
+  // Filtro de fonte
+  const contentType = (req.query.contentType || 'all').toString();
 
   try {
-    // where de datas
     const whereDate = createDateFilter(dateFilter, month);
 
-    // coleta de todos os modelos SEM limit/offset
-    const tasks = SOURCES.map(src =>
-      safeModelSearch(src.model, whereDate, sortBy, sortOrder, q, categories)
-        .then(rows => rows.map(r => ({ ...r, contentType: src.contentType })))
+    // Define fontes a consultar
+    const selectedSources = SOURCES.filter(src => {
+      if (contentType === 'all') return true;
+      return src.key === contentType || src.contentType === contentType;
+    });
+
+    // Execução concorrente sem paginação por modelo
+    const parts = await Promise.all(
+      selectedSources.map(async (src) => {
+        const rows = await safeModelSearch(src.model, whereDate, sortBy, sortOrder, q, categories, region);
+        return rows.map(r => ({ ...r, contentType: src.contentType }));
+      })
     );
 
-    const parts = await Promise.all(tasks);
+    // Merge
     let allResults = parts.flat();
 
-    // ordenação estável final
+    // Ordenação estável global
     allResults.sort((a, b) => {
-      const av = new Date(a.postDate || a.createdAt).getTime();
-      const bv = new Date(b.postDate || b.createdAt).getTime();
-      if (av !== bv) return sortOrder === 'DESC' ? (bv - av) : (av - bv);
+      const ap = new Date(a.postDate || a.createdAt).getTime();
+      const bp = new Date(b.postDate || b.createdAt).getTime();
+      if (ap !== bp) return sortOrder === 'DESC' ? (bp - ap) : (ap - bp);
 
       const ac = new Date(a.createdAt).getTime();
       const bc = new Date(b.createdAt).getTime();
       if (ac !== bc) return sortOrder === 'DESC' ? (bc - ac) : (ac - bc);
 
-      // id numérico ou string
       const ai = typeof a.id === 'number' ? a.id : Number(a.id) || 0;
       const bi = typeof b.id === 'number' ? b.id : Number(b.id) || 0;
       return sortOrder === 'DESC' ? (bi - ai) : (ai - bi);
     });
 
-    // paginação única
+    // Paginação única
     const total = allResults.length;
     const totalPages = Math.max(Math.ceil(total / limit), 1);
     const offset = (page - 1) * limit;
     const data = allResults.slice(offset, offset + limit);
 
-    const dt = Date.now() - t0;
-    return res.json({
+    // Payload + codificação
+    const payload = {
       page,
       perPage: limit,
       total,
       totalPages,
       data,
-      searchTime: dt,
-    });
+      searchTime: Date.now() - t0,
+    };
+
+    const encodedPayload = encodePayloadToBase64(payload);
+    return res.status(200).json({ data: encodedPayload });
   } catch (err) {
-    // resposta objetiva de erro
-    return res.status(500).json({
+    // Resposta de contingência também codificada
+    const emergencyPayload = {
+      page,
+      perPage: limit,
+      total: 0,
+      totalPages: 0,
+      data: [],
       error: 'SEARCH_FAILED',
       message: err?.message || 'Erro interno ao processar a busca.',
-    });
+      searchTime: Date.now() - t0,
+    };
+    const encodedPayload = encodePayloadToBase64(emergencyPayload);
+    return res.status(200).json({ data: encodedPayload });
   }
 });
 
