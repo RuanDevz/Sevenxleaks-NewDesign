@@ -1,259 +1,219 @@
+// /routes/UniversalSearch.js
 const express = require('express');
 const router = express.Router();
-const { AsianContent, WesternContent, BannedContent, UnknownContent, VipAsianContent, VipWesternContent, VipBannedContent, VipUnknownContent } = require('../models');
 const { Op, Sequelize } = require('sequelize');
 
-function insertRandomChar(base64Str) {
-  const letters = 'abcdefghijklmnopqrstuvwxyz';
-  const randomChar = letters.charAt(Math.floor(Math.random() * letters.length));
-  return base64Str.slice(0, 2) + randomChar + base64Str.slice(2);
-}
+const {
+  AsianContent,
+  WesternContent,
+  BannedContent,
+  UnknownContent,
+  VipAsianContent,
+  VipWesternContent,
+  VipBannedContent,
+  VipUnknownContent,
+} = require('../models');
 
-function encodePayloadToBase64(payload) {
-  const jsonStr = JSON.stringify(payload);
-  const base64Str = Buffer.from(jsonStr).toString('base64');
-  return insertRandomChar(base64Str);
-}
-
-// Função para criar filtros de data baseados no postDate
+/**
+ * Filtro de datas baseado em postDate.
+ * dateFilter: 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'prevMonth' | undefined
+ * month: 1..12 para filtrar mês específico do ano corrente
+ */
 function createDateFilter(dateFilter, month) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
-  let whereClause = {};
+
+  const where = {};
 
   if (month) {
-    whereClause.postDate = {
-      [Op.and]: [
-        Sequelize.where(
-          Sequelize.fn('EXTRACT', Sequelize.literal('MONTH FROM "postDate"')),
-          month
-        ),
-        Sequelize.where(
-          Sequelize.fn('EXTRACT', Sequelize.literal('YEAR FROM "postDate"')),
-          today.getFullYear()
-        )
-      ]
+    return {
+      postDate: {
+        [Op.and]: [
+          Sequelize.where(
+            Sequelize.fn('EXTRACT', Sequelize.literal('MONTH FROM "postDate"')),
+            month
+          ),
+          Sequelize.where(
+            Sequelize.fn('EXTRACT', Sequelize.literal('YEAR FROM "postDate"')),
+            today.getFullYear()
+          ),
+        ],
+      },
     };
-    return whereClause;
   }
+
+  const start = new Date(today);
+  const end = new Date(today);
+  end.setDate(end.getDate() + 1); // exclusivo
 
   switch (dateFilter) {
     case 'today':
-      const todayEnd = new Date(today);
-      todayEnd.setHours(23, 59, 59, 999);
-      whereClause.postDate = {
-        [Op.between]: [today, todayEnd]
-      };
+      where.postDate = { [Op.gte]: start, [Op.lt]: end };
       break;
-      
-    case 'yesterday':
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      const yesterdayEnd = new Date(yesterday);
-      yesterdayEnd.setHours(23, 59, 59, 999);
-      whereClause.postDate = {
-        [Op.between]: [yesterday, yesterdayEnd]
-      };
+    case 'yesterday': {
+      const y0 = new Date(today);
+      y0.setDate(y0.getDate() - 1);
+      const y1 = new Date(today);
+      where.postDate = { [Op.gte]: y0, [Op.lt]: y1 };
       break;
-      
-    case '7days':
-      const sevenDaysAgo = new Date(today);
-      sevenDaysAgo.setDate(today.getDate() - 7);
-      whereClause.postDate = {
-        [Op.gte]: sevenDaysAgo
-      };
+    }
+    case 'last7': {
+      const s = new Date(today);
+      s.setDate(s.getDate() - 7);
+      where.postDate = { [Op.gte]: s, [Op.lt]: end };
       break;
-      
-    case 'all':
+    }
+    case 'last30': {
+      const s = new Date(today);
+      s.setDate(s.getDate() - 30);
+      where.postDate = { [Op.gte]: s, [Op.lt]: end };
+      break;
+    }
+    case 'thisMonth': {
+      const s = new Date(today.getFullYear(), today.getMonth(), 1);
+      const e = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      where.postDate = { [Op.gte]: s, [Op.lt]: e };
+      break;
+    }
+    case 'prevMonth': {
+      const s = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const e = new Date(today.getFullYear(), today.getMonth(), 1);
+      where.postDate = { [Op.gte]: s, [Op.lt]: e };
+      break;
+    }
     default:
+      // sem filtro de data
       break;
   }
 
-  return whereClause;
+  return where;
 }
 
-// Função para buscar com timeout e fallback
-async function safeModelSearch(model, modelName, whereClause, sortBy, sortOrder, limit, offset) {  
-  try {
-    console.log(`Iniciando busca em ${modelName}...`);
-    
-    const result = await model.findAll({
-      where: whereClause,
-      order: [[sortBy, sortOrder]],
-      limit,
-      offset,
-      raw: true
-    });
-    
-    console.log(`Busca em ${modelName} concluída: ${result.length} itens`);
-    return result;
-    
-  } catch (error) {
-    console.error(`Erro ao buscar em ${modelName}:`, error.message);
-    return [];
+/**
+ * Busca segura por modelo, SEM paginação aqui.
+ * Ordena apenas para garantir estabilidade relativa antes do merge.
+ */
+async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categories) {
+  const where = { ...whereClause };
+
+  if (q) {
+    const like = { [Op.iLike]: `%${q}%` };
+    where[Op.or] = [
+      { name: like },
+      { slug: like },
+      { category: like },
+    ];
   }
+
+  if (categories && categories.length) {
+    where.category = { [Op.in]: categories };
+  }
+
+  return model.findAll({
+    where,
+    order: [
+      [Sequelize.col(sortBy), sortOrder],
+      ['createdAt', sortOrder],
+      ['id', sortOrder],
+    ],
+    raw: true,
+  });
 }
 
-// Rota universal de busca com implementação mais robusta
+/**
+ * Mapa de modelos => contentType fixo na resposta.
+ */
+const SOURCES = [
+  { model: AsianContent,         contentType: 'asian' },
+  { model: WesternContent,       contentType: 'western' },
+  { model: BannedContent,        contentType: 'banned' },
+  { model: UnknownContent,       contentType: 'unknown' },
+  { model: VipAsianContent,      contentType: 'vip-asian' },
+  { model: VipWesternContent,    contentType: 'vip-western' },
+  { model: VipBannedContent,     contentType: 'vip-banned' },
+  { model: VipUnknownContent,    contentType: 'vip-unknown' },
+];
+
+/**
+ * GET /universal-search/search
+ * Query params:
+ *  - page: número da página (1..n)
+ *  - limit: itens por página
+ *  - sortBy: default 'postDate'
+ *  - sortOrder: 'DESC' | 'ASC' (default 'DESC')
+ *  - dateFilter: conforme createDateFilter
+ *  - month: 1..12
+ *  - q: termo de busca
+ *  - categories: lista CSV de categorias a filtrar (ex.: "Asian,Teen,Big Tits")
+ */
 router.get('/search', async (req, res) => {
-  const startTime = Date.now();
-  
+  const t0 = Date.now();
+
+  // parâmetros
+  const page = Math.max(parseInt(req.query.page || '1', 10), 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10), 1), 500);
+  const sortBy = (req.query.sortBy || 'postDate');
+  const sortOrder = (String(req.query.sortOrder || 'DESC').toUpperCase() === 'ASC') ? 'ASC' : 'DESC';
+  const dateFilter = req.query.dateFilter;
+  const month = req.query.month ? parseInt(req.query.month, 10) : undefined;
+  const q = req.query.q ? String(req.query.q).trim() : undefined;
+  const categories = req.query.categories
+    ? String(req.query.categories)
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+    : undefined;
+
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 300;
-    const offset = (page - 1) * limit;
+    // where de datas
+    const whereDate = createDateFilter(dateFilter, month);
 
-    const { 
-      search, 
-      category, 
-      month, 
-      dateFilter,
-      contentType = 'all',
-      region,
-      sortBy = 'postDate', 
-      sortOrder = 'DESC' 
-    } = req.query;
+    // coleta de todos os modelos SEM limit/offset
+    const tasks = SOURCES.map(src =>
+      safeModelSearch(src.model, whereDate, sortBy, sortOrder, q, categories)
+        .then(rows => rows.map(r => ({ ...r, contentType: src.contentType })))
+    );
 
-    let searchWhere = {};
-    
-    // Filtro de busca por nome
-    if (search) {
-      searchWhere.name = { [Op.iLike]: `%${search}%` };
-    }
+    const parts = await Promise.all(tasks);
+    let allResults = parts.flat();
 
-    // Filtro de categoria
-    if (category) {
-      searchWhere.category = category;
-    }
-
-    // Filtro de região
-    if (region) {
-      searchWhere.region = region;
-    }
-
-    // Aplicar filtros de data
-    const dateWhere = createDateFilter(dateFilter || 'all', month);
-    const finalWhere = { ...searchWhere, ...dateWhere };
-
-    console.log('Iniciando busca universal com filtros:', finalWhere);
-
-    // Determinar quais tabelas buscar
-    const searchTasks = [];
-    
-    if (contentType === 'all' || contentType === 'asian') {
-      searchTasks.push({
-        name: 'asian',
-        task: () => safeModelSearch(AsianContent, 'AsianContent', finalWhere, sortBy, sortOrder, limit, offset)
-      });
-    }
-    if (contentType === 'all' || contentType === 'western') {
-      searchTasks.push({
-        name: 'western',
-        task: () => safeModelSearch(WesternContent, 'WesternContent', finalWhere, sortBy, sortOrder, limit, offset)
-      });
-    }
-    if (contentType === 'all' || contentType === 'banned') {
-      searchTasks.push({
-        name: 'banned',
-        task: () => safeModelSearch(BannedContent, 'BannedContent', finalWhere, sortBy, sortOrder, limit, offset)
-      });
-    }
-    if (contentType === 'all' || contentType === 'unknown') {
-      searchTasks.push({
-        name: 'unknown',
-        task: () => safeModelSearch(UnknownContent, 'UnknownContent', finalWhere, sortBy, sortOrder, limit, offset)
-      });
-    }
-    if (contentType === 'all' || contentType === 'vip-asian') {
-      searchTasks.push({
-        name: 'vip-asian',
-        task: () => safeModelSearch(VipAsianContent, 'VipAsianContent', finalWhere, sortBy, sortOrder, limit, offset)
-      });
-    }
-    if (contentType === 'all' || contentType === 'vip-western') {
-      searchTasks.push({
-        name: 'vip-western',
-        task: () => safeModelSearch(VipWesternContent, 'VipWesternContent', finalWhere, sortBy, sortOrder, limit, offset)
-      });
-    }
-    if (contentType === 'all' || contentType === 'vip-banned') {
-      searchTasks.push({
-        name: 'vip-banned',
-        task: () => safeModelSearch(VipBannedContent, 'VipBannedContent', finalWhere, sortBy, sortOrder, limit, offset)
-      });
-    }
-    if (contentType === 'all' || contentType === 'vip-unknown') {
-      searchTasks.push({
-        name: 'vip-unknown',
-        task: () => safeModelSearch(VipUnknownContent, 'VipUnknownContent', finalWhere, sortBy, sortOrder, limit, offset)
-      });
-    }
-
-    // Executar buscas
-    let allResults = [];
-    
-    try {
-      const searchPromises = searchTasks.map(({ name, task }) => 
-        task().then(results => ({ name, results: results.map(item => ({ ...item, contentType: name })) }))
-      );
-
-      const searchResults = await Promise.allSettled(searchPromises);
-
-      // Processar resultados
-      searchResults.forEach((result) => {
-        if (result.status === 'fulfilled' && result.value.results) {
-          allResults = [...allResults, ...result.value.results];
-        } else if (result.status === 'rejected') {
-          console.error(`Busca falhou:`, result.reason?.message || 'Erro desconhecido');
-        }
-      });
-
-    } catch (error) {
-      console.error('Erro nas buscas:', error.message);
-    }
-
-    // Ordenar resultados
+    // ordenação estável final
     allResults.sort((a, b) => {
-      const dateA = new Date(a.postDate || a.createdAt || Date.now());
-      const dateB = new Date(b.postDate || b.createdAt || Date.now());
-      return sortOrder === 'DESC' ? dateB.getTime() - dateA.getTime() : dateA.getTime() - dateB.getTime();
+      const av = new Date(a.postDate || a.createdAt).getTime();
+      const bv = new Date(b.postDate || b.createdAt).getTime();
+      if (av !== bv) return sortOrder === 'DESC' ? (bv - av) : (av - bv);
+
+      const ac = new Date(a.createdAt).getTime();
+      const bc = new Date(b.createdAt).getTime();
+      if (ac !== bc) return sortOrder === 'DESC' ? (bc - ac) : (ac - bc);
+
+      // id numérico ou string
+      const ai = typeof a.id === 'number' ? a.id : Number(a.id) || 0;
+      const bi = typeof b.id === 'number' ? b.id : Number(b.id) || 0;
+      return sortOrder === 'DESC' ? (bi - ai) : (ai - bi);
     });
 
-    // Paginação
+    // paginação única
     const total = allResults.length;
-    const paginatedResults = allResults.slice(offset, offset + limit);
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+    const offset = (page - 1) * limit;
+    const data = allResults.slice(offset, offset + limit);
 
-    const payload = {
+    const dt = Date.now() - t0;
+    return res.json({
       page,
       perPage: limit,
       total,
-      totalPages: Math.ceil(total / limit),
-      data: paginatedResults,
-      searchTime: Date.now() - startTime
-    };
-
-    console.log(`Busca concluída em ${Date.now() - startTime}ms. Retornando ${paginatedResults.length} de ${total} itens.`);
-
-    const encodedPayload = encodePayloadToBase64(payload);
-    return res.status(200).json({ data: encodedPayload });
-
-  } catch (error) {
-    console.error('Erro crítico na busca universal:', error);
-    
-    // Resposta de emergência
-    const emergencyPayload = {
-      page: parseInt(req.query.page) || 1,
-      perPage: Math.min(parseInt(req.query.limit) || 150, 150),
-      total: 0,
-      totalPages: 0,
-      data: [],
-      error: 'Serviço temporariamente indisponível',
-      searchTime: Date.now() - startTime
-    };
-    
-    const encodedPayload = encodePayloadToBase64(emergencyPayload);
-    res.status(200).json({ data: encodedPayload });
+      totalPages,
+      data,
+      searchTime: dt,
+    });
+  } catch (err) {
+    // resposta objetiva de erro
+    return res.status(500).json({
+      error: 'SEARCH_FAILED',
+      message: err?.message || 'Erro interno ao processar a busca.',
+    });
   }
 });
 
