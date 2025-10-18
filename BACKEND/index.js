@@ -17,7 +17,6 @@ app.use(cors({
 app.use((req, res, next) => {
   const referer = req.headers.referer || '';
   const origin = req.headers.origin || '';
-
   const blockedDomains = ['https://bypass.city/'];
 
   if (blockedDomains.some(domain => referer.includes(domain) || origin.includes(domain))) {
@@ -27,10 +26,8 @@ app.use((req, res, next) => {
   next();
 });
 
-//
 const webhookRouter = require('./routes/stripewebhook');
-app.use('/webhook', webhookRouter)
-
+app.use('/webhook', webhookRouter);
 
 app.use((req, res, next) => {
   if (req.originalUrl === '/webhook') {
@@ -40,8 +37,7 @@ app.use((req, res, next) => {
   }
 });
 
-
-
+// Rotas
 const linkvertiseConfigRouter = require('./routes/linkvertiseConfig');
 const userRouter = require('./routes/user');
 const AsianRouter = require('./routes/AsianContent');
@@ -56,14 +52,14 @@ const recommendationsRouter = require('./routes/recommendations');
 const authRoutes = require('./routes/authRoutes');
 const stripeWebhookRouter = require('./routes/stripewebhook');
 const renewVipRouter = require('./routes/Renewvip');
-const cancelsubscriptionRouter = require('./routes/Cancelsubscription')
+const cancelsubscriptionRouter = require('./routes/Cancelsubscription');
 const filterOptionsRoutes = require('./routes/FilterOptions');
 const stripeCustomerPortalRouter = require('./routes/stripeCustomerPortal');
 const bannedContentRouter = require('./routes/BannedContent');
 const unknownContentRouter = require('./routes/UnknownContent');
 const rateLimit = require('express-rate-limit');
 const checkApiKey = require('./Middleware/CheckapiKey');
-const WesternRouter = require('./routes/WesternContent')
+const WesternRouter = require('./routes/WesternContent');
 const VipAsianRouter = require('./routes/VipAsianContent');
 const VipWesternRouter = require('./routes/VipWesternContent');
 const VipBannedRouter = require('./routes/VipBannedContent');
@@ -76,10 +72,7 @@ app.use('/asiancontent', ensureConnection);
 app.use('/westerncontent', ensureConnection);
 
 app.use('/auth', userRouter);
-
-
 app.use('/cancel-subscription', cancelsubscriptionRouter);
-
 app.use('/auth', authRoutes);
 app.use('/vipcontent', checkApiKey, VipRouter);
 app.use('/pay', payRouter);
@@ -93,7 +86,6 @@ app.use('/auth', renewVipRouter);
 app.use('/filteroptions', filterOptionsRoutes);
 app.use('/linkvertise-config', linkvertiseConfigRouter);
 app.use('/stripe-portal', stripeCustomerPortalRouter);
-
 app.use('/westerncontent', checkApiKey, WesternRouter);
 app.use('/asiancontent', checkApiKey, AsianRouter);
 app.use('/bannedcontent', checkApiKey, bannedContentRouter);
@@ -102,7 +94,6 @@ app.use('/vip-asiancontent', checkApiKey, VipAsianRouter);
 app.use('/vip-westerncontent', checkApiKey, VipWesternRouter);
 app.use('/vip-bannedcontent', checkApiKey, VipBannedRouter);
 app.use('/vip-unknowncontent', checkApiKey, VipUnknownRouter);
-
 app.use('/universal-search', checkApiKey, universalSearchRouter);
 
 const limiter = rateLimit({
@@ -113,7 +104,7 @@ const limiter = rateLimit({
 
 app.use(limiter); 
 
-
+// Bloqueio de bots e requisições suspeitas
 app.use((req, res, next) => {
   const ua = req.headers['user-agent'] || '';
   if (/curl|wget|bot|spider/i.test(ua)) {
@@ -124,7 +115,6 @@ app.use((req, res, next) => {
 
 app.use((req, res, next) => {
   const url = decodeURIComponent(req.originalUrl);
-
   const bloqueios = [
     /\.bak$/i,
     /\.old$/i,
@@ -142,15 +132,13 @@ app.use((req, res, next) => {
       return res.status(403).send('Access denied.');
     }
   }
-
   next();
 });
 
-
-
+// 🔗 Configuração do pool do PostgreSQL
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL, 
-  max: 3, // Máximo de conexões no pool
+  max: 3,
   min: 0,
   idle: 5000,
   connectionTimeoutMillis: 60000,
@@ -162,30 +150,28 @@ const pool = new Pool({
   }
 });
 
-// Teste de conexão mais robusto
+// 🧠 Teste de conexão ao banco
 const testConnection = async () => {
   try {
     const client = await pool.connect();
-    console.log('Conexão bem-sucedida ao banco de dados');
+    console.log('✅ Conexão bem-sucedida ao banco de dados');
     client.release();
   } catch (err) {
-    console.error('Erro ao conectar ao banco de dados:', err);
+    console.error('❌ Erro ao conectar ao banco de dados:', err);
   }
 };
 
-// Configuração mais robusta do Sequelize
+// ⚙️ Inicialização do Sequelize
 const initializeDatabase = async () => {
   try {
-    // Teste de autenticação com timeout
     await Promise.race([
       db.sequelize.authenticate(),
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Timeout na autenticação')), 10000)
       )
     ]);
-    console.log('Conexão Sequelize estabelecida com sucesso.');
-    
-    // Criar tabelas se não existirem (tanto dev quanto prod)
+    console.log('✅ Conexão Sequelize estabelecida com sucesso.');
+
     const tablesCreated = await Promise.race([
       db.createTablesIfNotExist(),
       new Promise((_, reject) => 
@@ -198,58 +184,43 @@ const initializeDatabase = async () => {
     } else {
       console.warn('⚠️ Algumas tabelas podem não ter sido criadas corretamente.');
     }
-    
     return true;
   } catch (error) {
-    console.error('Erro na inicialização do banco:', error.message);
-    
-    // Tenta continuar mesmo com erro de sync
+    console.error('❌ Erro na inicialização do banco:', error.message);
     console.log('⚠️ Continuando sem sync completo...');
     return true;
   }
 };
 
-// Inicialização assíncrona
+// 🚀 Inicialização assíncrona principal
 (async () => {
   try {
-    // Testa conexão do pool
     await testConnection();
-    
-    // Inicializa Sequelize
     const dbInitialized = await initializeDatabase();
-    
+
     if (dbInitialized) {
       const PORT = process.env.PORT || 3001;
       const server = app.listen(PORT, () => {
-        console.log(`Servidor rodando na porta ${PORT}...`);
+        console.log(`🚀 Servidor rodando na porta ${PORT}...`);
       });
-      
-      // Graceful shutdown
-      process.on('SIGTERM', async () => {
-        console.log('SIGTERM recebido, fechando servidor...');
-        server.close(async () => {
-          await db.sequelize.close();
-          await pool.end();
-          process.exit(0);
-        });
+
+      // 🔸 Removido o fechamento automático de conexões (mantém estável)
+      process.on('SIGTERM', () => {
+        console.log('🟡 SIGTERM recebido. Servidor será encerrado pelo sistema.');
       });
-      
-      process.on('SIGINT', async () => {
-        console.log('SIGINT recebido, fechando servidor...');
-        server.close(async () => {
-          await db.sequelize.close();
-          await pool.end();
-          process.exit(0);
-        });
+
+      process.on('SIGINT', () => {
+        console.log('🟡 SIGINT recebido. Encerrando servidor...');
       });
+
     } else {
-      console.error('Falha na inicialização do banco de dados');
+      console.error('❌ Falha na inicialização do banco de dados');
       process.exit(1);
     }
   } catch (error) {
-    console.error('Erro fatal na inicialização:', error);
+    console.error('💀 Erro fatal na inicialização:', error);
     process.exit(1);
   }
 })();
 
-  module.exports = app;
+module.exports = app;
