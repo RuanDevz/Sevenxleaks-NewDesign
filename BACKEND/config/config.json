@@ -31,7 +31,7 @@
       "idle_in_transaction_session_timeout": 8000
     },
     "pool": { 
-      "max": 1, 
+      "max": 5, 
       "min": 0, 
       "idle": 2000, 
       "acquire": 10000,

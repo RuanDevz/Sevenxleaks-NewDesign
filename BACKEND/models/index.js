@@ -34,7 +34,7 @@ if (url) {
       idle_in_transaction_session_timeout: 10000
     },
     pool: {
-      max: 1, // Apenas 1 conexão para evitar concorrência
+      max: 5, // Apenas 1 conexão para evitar concorrência
       min: 0,
       idle: 3000, // Reduzido drasticamente
       acquire: 15000, // Reduzido para 15 segundos
