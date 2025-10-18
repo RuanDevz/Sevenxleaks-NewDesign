@@ -1,6 +1,6 @@
 const { sequelize } = require('../models');
 
-// Função para verificar saúde da conexão
+// 🔍 Função para verificar a saúde da conexão
 async function checkDatabaseHealth() {
   try {
     await sequelize.authenticate();
@@ -12,12 +12,12 @@ async function checkDatabaseHealth() {
   }
 }
 
-// Função para reconectar em caso de falha
+// ♻️ Função para tentar reconectar (sem fechar o Sequelize)
 async function reconnectDatabase() {
   try {
     console.log('🔄 Tentando reconectar ao banco...');
-    await sequelize.close();
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Aguarda 2s
+    // tenta autenticar novamente, sem fechar o pool
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Aguarda 2s antes da tentativa
     await sequelize.authenticate();
     console.log('✅ Reconexão bem-sucedida');
     return true;
@@ -27,24 +27,26 @@ async function reconnectDatabase() {
   }
 }
 
-// Middleware para verificar conexão antes de queries críticas
+// 🧠 Middleware que garante conexão ativa antes de rotas críticas
 const ensureConnection = async (req, res, next) => {
   try {
     const isHealthy = await checkDatabaseHealth();
+
     if (!isHealthy) {
       const reconnected = await reconnectDatabase();
       if (!reconnected) {
-        return res.status(503).json({ 
+        return res.status(503).json({
           error: 'Serviço temporariamente indisponível',
           message: 'Problemas de conectividade com o banco de dados'
         });
       }
     }
+
     next();
   } catch (error) {
     console.error('Erro no health check:', error.message);
-    return res.status(503).json({ 
-      error: 'Serviço temporariamente indisponível' 
+    return res.status(503).json({
+      error: 'Serviço temporariamente indisponível'
     });
   }
 };

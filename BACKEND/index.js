@@ -135,7 +135,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// 🔗 Configuração do pool do PostgreSQL
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL, 
   max: 3,
