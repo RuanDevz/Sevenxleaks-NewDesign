@@ -25,7 +25,7 @@ if (url) {
         rejectUnauthorized: false
       },
       // Configurações agressivas de timeout
-      connectTimeout: 20000,
+      connectTimeout: 35000,
       socketTimeout: 20000,
       keepAlive: true,
       keepAliveInitialDelayMillis: 0,

@@ -22,7 +22,7 @@
         "require": true, 
         "rejectUnauthorized": false 
       },
-      "connectTimeout": 15000,
+      "connectTimeout": 35000,
       "socketTimeout": 15000,
       "keepAlive": true,
       "keepAliveInitialDelayMillis": 0,
