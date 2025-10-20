@@ -54,9 +54,14 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         defaultValue: [], 
       },
-      stripeSubscriptionId: { 
-        type: DataTypes.STRING, 
+      stripeSubscriptionId: {
+        type: DataTypes.STRING,
         allowNull: true,
+      },
+      stripeAccountVersion: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        defaultValue: 'v1',
       },
       isDisabled: {
         type: DataTypes.BOOLEAN,

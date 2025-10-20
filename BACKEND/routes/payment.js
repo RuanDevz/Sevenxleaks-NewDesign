@@ -1,6 +1,6 @@
 const express = require('express');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { User } = require('../models');
+const stripeService = require('../Services/StripeService');
 
 const router = express.Router();
 
@@ -18,17 +18,16 @@ router.post('/vip-payment', async (req, res) => {
             return res.status(403).json({ error: 'Este e-mail não está autorizado para pagamento.' });
         }
 
-        const prices = {
-            monthly: process.env.STRIPE_PRICEID_MONTHLY,
-            annual: process.env.STRIPE_PRICEID_ANNUAL,
-        };
+        const stripeVersion = stripeService.getDefaultVersion();
+        const stripe = stripeService.getClient(stripeVersion);
+        const priceId = stripeService.getPriceId(stripeVersion, planType);
 
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             customer_email: email,
             line_items: [
               {
-                price: prices[planType],
+                price: priceId,
                 quantity: 1,
               },
             ],
@@ -36,7 +35,8 @@ router.post('/vip-payment', async (req, res) => {
             success_url: `${process.env.FRONTEND_URL}/success`,
             cancel_url: `${process.env.FRONTEND_URL}/cancel`,
             metadata: {
-              priceId: prices[planType],
+              priceId: priceId,
+              stripeVersion: stripeVersion,
             },
           });
 

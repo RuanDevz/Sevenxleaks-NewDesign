@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { User } = require('../models');
 const Authmiddleware = require('../Middleware/Auth');
+const stripeService = require('../Services/StripeService');
 
 // Criar sessão do Customer Portal
 router.post('/create-portal-session', Authmiddleware, async (req, res) => {
@@ -22,6 +22,9 @@ router.post('/create-portal-session', Authmiddleware, async (req, res) => {
     }
 
     // Buscar o customer_id da assinatura
+    const stripeVersion = user.stripeAccountVersion || 'v1';
+    const stripe = stripeService.getClient(stripeVersion);
+
     const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
     const customerId = subscription.customer;
 

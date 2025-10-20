@@ -1,31 +1,44 @@
 const express = require('express');
 const router = express.Router();
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { User } = require('../models');
 const bodyParser = require('body-parser');
-const sendConfirmationEmail = require('../Services/Emailsend')
+const sendConfirmationEmail = require('../Services/Emailsend');
+const stripeService = require('../Services/StripeService');
 
 router.post(
   '/',
   express.raw({ type: 'application/json' }),
   async (req, res) => {
     const sig = req.headers['stripe-signature'];
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     let event;
+    let stripeVersion = null;
 
-    try {
-      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
-    } catch (err) {
-      console.error('⚠️ Erro na verificação do webhook:', err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
+    for (const version of ['v1', 'v2']) {
+      try {
+        const endpointSecret = stripeService.getWebhookSecret(version);
+        const stripe = stripeService.getClient(version);
+        event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+        stripeVersion = version;
+        break;
+      } catch (err) {
+        continue;
+      }
     }
+
+    if (!event || !stripeVersion) {
+      console.error('⚠️ Erro na verificação do webhook: assinatura inválida para ambas as contas');
+      return res.status(400).send('Webhook Error: Invalid signature');
+    }
+
+    console.log(`✅ Webhook recebido da conta Stripe ${stripeVersion}: ${event.type}`);
 
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
         const customerEmail = session.customer_email;
         const priceId = session.metadata?.priceId;
+        const sessionStripeVersion = session.metadata?.stripeVersion || stripeVersion;
 
         if (!customerEmail || !priceId) {
           return res.status(400).send('Dados do cliente ou preço não encontrados');
@@ -38,9 +51,14 @@ router.post(
           const now = new Date();
           let newExpiration = new Date(now);
 
-          if (priceId === process.env.STRIPE_PRICEID_MONTHLY) {
+          const monthlyPriceV1 = process.env.STRIPE_PRICEID_MONTHLY;
+          const annualPriceV1 = process.env.STRIPE_PRICEID_ANNUAL;
+          const monthlyPriceV2 = process.env.STRIPE_PRICEID_MONTHLY_V2;
+          const annualPriceV2 = process.env.STRIPE_PRICEID_ANNUAL_V2;
+
+          if (priceId === monthlyPriceV1 || priceId === monthlyPriceV2) {
             newExpiration.setDate(now.getDate() + 30);
-          } else if (priceId === process.env.STRIPE_PRICEID_ANNUAL) {
+          } else if (priceId === annualPriceV1 || priceId === annualPriceV2) {
             newExpiration.setDate(now.getDate() + 365);
           } else {
             return res.status(400).send('Plano não reconhecido');
@@ -50,6 +68,7 @@ router.post(
             isVip: true,
             vipExpirationDate: newExpiration,
             stripeSubscriptionId: session.subscription || null,
+            stripeAccountVersion: sessionStripeVersion,
           });
 
           await sendConfirmationEmail(customerEmail);
@@ -66,6 +85,7 @@ router.post(
   const subscriptionId = invoice.subscription;
 
   try {
+    const stripe = stripeService.getClient(stripeVersion);
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     const priceId = subscription.items.data[0].price.id;
 
@@ -79,9 +99,14 @@ router.post(
     const now = new Date();
     let newExpiration = new Date(now);
 
-    if (priceId === process.env.STRIPE_PRICEID_MONTHLY) {
+    const monthlyPriceV1 = process.env.STRIPE_PRICEID_MONTHLY;
+    const annualPriceV1 = process.env.STRIPE_PRICEID_ANNUAL;
+    const monthlyPriceV2 = process.env.STRIPE_PRICEID_MONTHLY_V2;
+    const annualPriceV2 = process.env.STRIPE_PRICEID_ANNUAL_V2;
+
+    if (priceId === monthlyPriceV1 || priceId === monthlyPriceV2) {
       newExpiration.setDate(now.getDate() + 30);
-    } else if (priceId === process.env.STRIPE_PRICEID_ANNUAL) {
+    } else if (priceId === annualPriceV1 || priceId === annualPriceV2) {
       newExpiration.setDate(now.getDate() + 365);
     } else {
       console.error('Plano não reconhecido para invoice.paid');
@@ -93,7 +118,7 @@ router.post(
       vipExpirationDate: newExpiration,
     });
 
-    console.log(`✅ VIP atualizado após pagamento de invoice para: ${user.email}`);
+    console.log(`✅ VIP atualizado após pagamento de invoice para: ${user.email} (conta ${stripeVersion})`);
     return res.status(200).send({ received: true });
 
   } catch (err) {

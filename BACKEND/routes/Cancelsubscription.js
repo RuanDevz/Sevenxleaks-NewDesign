@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { User } = require('../models');
 const Authmiddleware = require('../Middleware/Auth');
+const stripeService = require('../Services/StripeService');
 
 router.post('/', Authmiddleware, async (req, res) => {
   try {
@@ -13,6 +13,9 @@ router.post('/', Authmiddleware, async (req, res) => {
     if (!user || !user.stripeSubscriptionId) {
       return res.status(400).json({ error: 'Nenhuma assinatura ativa encontrada.' });
     }
+
+    const stripeVersion = user.stripeAccountVersion || 'v1';
+    const stripe = stripeService.getClient(stripeVersion);
 
     const subscription = await stripe.subscriptions.cancel(user.stripeSubscriptionId);
 
