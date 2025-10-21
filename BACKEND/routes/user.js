@@ -19,6 +19,33 @@ router.get('/', Authmiddleware, isAdmin, async (req, res) => {
     }
 });
 
+router.get('/dashboard', Authmiddleware, async (req, res) => {
+    const userId = req.user.id;
+
+    try {
+        const user = await User.findByPk(userId);
+
+         const now = new Date();
+         if (!user.vipExpirationDate || new Date(user.vipExpirationDate) < now) {
+             if (user.isVip) {
+                 await user.update({ isVip: false });
+             }
+         }
+        return res.json({
+            name: user.name,
+            email: user.email,
+            isVip: user.isVip,
+            isAdmin: user.isAdmin,
+            favorites: user.favorites,
+            vipExpirationDate: user.vipExpirationDate,
+            createdAt: user.createdAt
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Erro interno do servidor" });
+    }
+});
+
 router.post('/cancel-subscription', async (req, res) => {
     const { userId } = req.body;
   
