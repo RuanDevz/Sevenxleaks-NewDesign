@@ -155,13 +155,17 @@ router.get('/is-vip/:email', async (req, res) => {
 
 router.post('/register', async (req, res) => {
     const { name, email, password } = req.body;
+    console.log('[REGISTER] Body recebido:', { name, email });
 
     try {
         const hashpassword = await bcrypt.hash(password, 10);
+        console.log('[REGISTER] Hash gerado com sucesso');
 
         const existingemail = await User.findOne({ where: { email } });
+        console.log('[REGISTER] Verificação de email existente:', existingemail ? 'Encontrado' : 'Não encontrado');
 
         if (existingemail) {
+            console.warn('[REGISTER] Email já cadastrado:', email);
             return res.status(409).json({ error: 'Email already registered!' });
         }
 
@@ -172,59 +176,54 @@ router.post('/register', async (req, res) => {
             isVip: false,
             isAdmin: false
         });
-//
+        console.log('[REGISTER] Usuário criado com ID:', createnewuser.id);
+
         res.status(201).json({
             name: createnewuser.name,
             email: createnewuser.email,
         });
 
     } catch (error) {
+        console.error('[REGISTER] Erro ao registrar usuário:', error);
         res.status(500).json({ error: 'Erro ao registrar usuário.' });
     }
 });
 
 
+
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
-
-    const user = await User.findOne({ where: { email } });
-
-    if (!user || !bcrypt.compareSync(password, user.password)) {
-        return res.status(401).json({ error: "Credenciais incorretas!" });
-    }
-
-    const accesstoken = sign({ email: user.email, id: user.id }, process.env.TOKEN_VERIFY_ACCESS);
-
-    res.json({ token: accesstoken, name: user.name });
-
-});
-
-router.get('/dashboard', Authmiddleware, async (req, res) => {
-    const userId = req.user.id;
+    console.log('[LOGIN] Tentando login com:', email);
 
     try {
-        const user = await User.findByPk(userId);
+        const user = await User.findOne({ where: { email } });
+        if (!user) {
+            console.warn('[LOGIN] Usuário não encontrado:', email);
+            return res.status(401).json({ error: "Credenciais incorretas!" });
+        }
 
-         const now = new Date();
-         if (!user.vipExpirationDate || new Date(user.vipExpirationDate) < now) {
-             if (user.isVip) {
-                 await user.update({ isVip: false });
-             }
-         }
-        return res.json({
-            name: user.name,
-            email: user.email,
-            isVip: user.isVip,
-            isAdmin: user.isAdmin,
-            favorites: user.favorites,
-            vipExpirationDate: user.vipExpirationDate,
-            createdAt: user.createdAt
-        });
+        const passwordMatch = bcrypt.compareSync(password, user.password);
+        console.log('[LOGIN] Comparação de senha:', passwordMatch);
+
+        if (!passwordMatch) {
+            return res.status(401).json({ error: "Credenciais incorretas!" });
+        }
+
+        if (!process.env.TOKEN_VERIFY_ACCESS) {
+            console.error('[LOGIN] TOKEN_VERIFY_ACCESS não configurado no ambiente!');
+            return res.status(500).json({ error: 'Token inválido.' });
+        }
+
+        const accesstoken = sign({ email: user.email, id: user.id }, process.env.TOKEN_VERIFY_ACCESS);
+        console.log('[LOGIN] Token gerado com sucesso');
+
+        res.json({ token: accesstoken, name: user.name });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Erro interno do servidor" });
+        console.error('[LOGIN] Erro inesperado:', error);
+        res.status(500).json({ error: "Erro interno no login" });
     }
 });
+
 
 
 //

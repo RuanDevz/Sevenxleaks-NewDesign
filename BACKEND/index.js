@@ -26,6 +26,9 @@ app.use((req, res, next) => {
   next();
 });
 
+console.log = (...args) => process.stdout.write(args.join(' ') + '\n');
+console.error = (...args) => process.stderr.write(args.join(' ') + '\n');
+
 const webhookRouter = require('./routes/stripewebhook');
 app.use('/webhook', webhookRouter);
 
