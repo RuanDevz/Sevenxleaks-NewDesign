@@ -40,8 +40,6 @@ app.use((req, res, next) => {
   }
 });
 
-// Rotas
-const linkvertiseConfigRouter = require('./routes/linkvertiseConfig');
 const userRouter = require('./routes/user');
 const AsianRouter = require('./routes/AsianContent');
 const payRouter = require('./routes/payment');
@@ -87,7 +85,6 @@ app.use('/admin/requests', checkApiKey, RequestsRouter);
 app.use('/webhook', stripeWebhookRouter);
 app.use('/auth', renewVipRouter);
 app.use('/filteroptions', filterOptionsRoutes);
-app.use('/linkvertise-config', linkvertiseConfigRouter);
 app.use('/stripe-portal', stripeCustomerPortalRouter);
 app.use('/westerncontent', checkApiKey, WesternRouter);
 app.use('/asiancontent', checkApiKey, AsianRouter);
