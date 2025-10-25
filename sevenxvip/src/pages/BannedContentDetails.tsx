@@ -46,20 +46,20 @@ const BannedContentDetails = () => {
   const [linkvertiseAccount, setLinkvertiseAccount] = useState<string>("518238");
   const [benefitsOpen, setBenefitsOpen] = useState<boolean>(false);
 
-  useEffect(() => {
-    const fetchLinkvertiseConfig = async () => {
-      try {
-        const response = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/linkvertise-config`,
-          { headers: { "x-api-key": `${import.meta.env.VITE_FRONTEND_API_KEY}` } }
-        );
-        if (response.data && response.data.activeAccount) setLinkvertiseAccount(response.data.activeAccount);
-      } catch {
-        setLinkvertiseAccount("518238");
-      }
-    };
-    fetchLinkvertiseConfig();
-  }, []);
+  // useEffect(() => {
+  //   const fetchLinkvertiseConfig = async () => {
+  //     try {
+  //       const response = await axios.get(
+  //         `${import.meta.env.VITE_BACKEND_URL}/linkvertise-config`,
+  //         { headers: { "x-api-key": `${import.meta.env.VITE_FRONTEND_API_KEY}` } }
+  //       );
+  //       if (response.data && response.data.activeAccount) setLinkvertiseAccount(response.data.activeAccount);
+  //     } catch {
+  //       setLinkvertiseAccount("518238");
+  //     }
+  //   };
+  //   fetchLinkvertiseConfig();
+  // }, []);
 
   useEffect(() => {
     if (content) {
