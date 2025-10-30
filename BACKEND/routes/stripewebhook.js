@@ -1,52 +1,26 @@
 const express = require('express');
 const router = express.Router();
-const Stripe = require('stripe');
-const stripeCPF = Stripe(process.env.STRIPE_SECRET_KEY);
-const stripePJ  = Stripe(process.env.SECONDARY_STRIPE_SECRET_KEY);
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { User } = require('../models');
-const bodyParser = require('body-parser'); // mantido conforme seu código atual
-const sendConfirmationEmail = require('../Services/Emailsend');
-
-// Segredos de webhook por conta
-const whsecCPF = process.env.STRIPE_WEBHOOK_SECRET;
-const whsecPJ  = process.env.SECONDARY_STRIPE_WEBHOOK_SECRET;
+const bodyParser = require('body-parser');
+const sendConfirmationEmail = require('../Services/Emailsend')
 
 router.post(
   '/',
   express.raw({ type: 'application/json' }),
   async (req, res) => {
     const sig = req.headers['stripe-signature'];
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     let event;
-    let origin = null;         // 'CPF' | 'PJ'
-    let stripe = null;         // SDK correto por origem
 
-    // 1) Verificação de assinatura contra AMBAS as contas
     try {
-      event  = Stripe.webhooks.constructEvent(req.body, sig, whsecCPF);
-      origin = 'CPF';
-      stripe = stripeCPF;
-    } catch (errCPF) {
-      try {
-        event  = Stripe.webhooks.constructEvent(req.body, sig, whsecPJ);
-        origin = 'PJ';
-        stripe = stripePJ;
-      } catch (errPJ) {
-        console.error('⚠️ Erro na verificação do webhook:', errPJ.message);
-        return res.status(400).send(`Webhook Error: ${errPJ.message}`);
-      }
+      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+    } catch (err) {
+      console.error('⚠️ Erro na verificação do webhook:', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // 2) Mapear IDs de preço conforme origem
-    const PRICE_MONTHLY   = origin === 'PJ'
-      ? process.env.SECONDARY_STRIPE_PRICEID_MONTHLY
-      : process.env.STRIPE_PRICEID_MONTHLY;
-
-    const PRICE_ANNUAL    = origin === 'PJ'
-      ? process.env.SECONDARY_STRIPE_PRICEID_ANNUAL
-      : process.env.STRIPE_PRICEID_ANNUAL;
-
-    // 3) Processamento de eventos
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
@@ -64,9 +38,9 @@ router.post(
           const now = new Date();
           let newExpiration = new Date(now);
 
-          if (priceId === PRICE_MONTHLY) {
+          if (priceId === process.env.STRIPE_PRICEID_MONTHLY) {
             newExpiration.setDate(now.getDate() + 30);
-          } else if (priceId === PRICE_ANNUAL) {
+          } else if (priceId === process.env.STRIPE_PRICEID_ANNUAL) {
             newExpiration.setDate(now.getDate() + 365);
           } else {
             return res.status(400).send('Plano não reconhecido');
@@ -76,8 +50,6 @@ router.post(
             isVip: true,
             vipExpirationDate: newExpiration,
             stripeSubscriptionId: session.subscription || null,
-            // opcional: se existir coluna stripeAccount no seu modelo, você pode gravar:
-            // stripeAccount: origin
           });
 
           await sendConfirmationEmail(customerEmail);
@@ -88,49 +60,82 @@ router.post(
         break;
       }
 
-      case 'invoice.paid': {
-        const invoice = event.data.object;
-        const subscriptionId = invoice.subscription;
+     case 'invoice.paid': {
+  const invoice = event.data.object;
 
-        try {
-          // recuperar a assinatura na CONTA de origem
-          const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-          const priceId = subscription.items.data[0].price.id;
+  // Extrair ID da assinatura considerando mudanças no schema
+  const subscriptionId =
+    invoice.subscription ||
+    invoice.parent?.subscription_details?.subscription ||
+    invoice.lines?.data?.[0]?.parent?.subscription_item_details?.subscription ||
+    null;
 
-          const user = await User.findOne({ where: { stripeSubscriptionId: subscriptionId } });
+  if (!subscriptionId) {
+    console.error('subscriptionId ausente no invoice.paid');
+    return res.status(400).send('subscriptionId ausente no invoice.paid');
+  }
 
-          if (!user) {
-            console.error('Usuário com assinatura não encontrado para invoice.paid');
-            return res.status(404).send('Usuário não encontrado');
-          }
+  try {
+    // Buscar a assinatura para dados canônicos do período e price
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
-          const now = new Date();
-          let newExpiration = new Date(now);
+    // priceId direto da assinatura ou, em fallback, da invoice line
+    const priceId =
+      subscription.items?.data?.[0]?.price?.id ||
+      invoice.lines?.data?.[0]?.pricing?.price_details?.price ||
+      null;
 
-          if (priceId === PRICE_MONTHLY) {
-            newExpiration.setDate(now.getDate() + 30);
-          } else if (priceId === PRICE_ANNUAL) {
-            newExpiration.setDate(now.getDate() + 365);
-          } else {
-            console.error('Plano não reconhecido para invoice.paid');
-            return res.status(400).send('Plano desconhecido');
-          }
+    if (!priceId) {
+      console.error('priceId não identificado no invoice.paid');
+      return res.status(400).send('priceId não identificado');
+    }
 
-          await user.update({
-            isVip: true,
-            vipExpirationDate: newExpiration,
-            // opcional: se existir a coluna
-            // stripeAccount: origin
-          });
+    // Localizar usuário pela assinatura; se falhar, tentar por customer
+    let user =
+      await User.findOne({ where: { stripeSubscriptionId: subscriptionId } });
 
-          console.log(`✅ VIP atualizado após pagamento de invoice para: ${user.email}`);
-          return res.status(200).send({ received: true });
+    if (!user) {
+      // Fallbacks opcionais se você mantiver estes campos no seu modelo:
+      // 1) por stripeCustomerId, se existir na sua base
+      // 2) por e-mail da fatura
+      const byCustomer =
+        invoice.customer && await User.findOne({ where: { stripeCustomerId: invoice.customer } });
+      const byEmail =
+        !byCustomer && invoice.customer_email
+          ? await User.findOne({ where: { email: invoice.customer_email } })
+          : null;
+      user = byCustomer || byEmail;
 
-        } catch (err) {
-          console.error('Erro ao processar invoice.paid:', err);
-          return res.status(500).send('Erro ao processar invoice.paid');
-        }
+      if (!user) {
+        console.error('Usuário com assinatura não encontrado para invoice.paid');
+        return res.status(404).send('Usuário não encontrado');
       }
+
+      // Opcional: consolidar o vínculo se achado por fallback
+      if (!user.stripeSubscriptionId) {
+        await user.update({ stripeSubscriptionId: subscriptionId });
+      }
+    }
+
+    // Definir validade usando o fim do período atual da assinatura
+    // Evita suposições de 30/365 e respeita proration e interval_count
+    const periodEnd = subscription.current_period_end; // epoch seconds
+    const newExpiration = new Date(periodEnd * 1000);
+
+    await user.update({
+      isVip: true,
+      vipExpirationDate: newExpiration,
+    });
+
+    console.log(`VIP atualizado após invoice.paid para: ${user.email}`);
+    return res.status(200).send({ received: true });
+  } catch (err) {
+    console.error('Erro ao processar invoice.paid:', err);
+    return res.status(500).send('Erro ao processar invoice.paid');
+  }
+}
+
+
 
       case 'customer.subscription.deleted': {
         const subscription = event.data.object;
@@ -154,9 +159,10 @@ router.post(
         console.log(`Evento não tratado: ${event.type}`);
     }
 
-    // resposta padrão quando não houve retorno antecipado
-    res.status(200).send({ received: true, origin });
+    res.status(200).send({ received: true });
   }
 );
+
+
 
 module.exports = router;
