@@ -11,15 +11,13 @@ const sendConfirmationEmail = require('../Services/Emailsend');
 const { nfseEnviar, nfseConsultar, nfseCancelar } = require('../lib/focus');
 const { buildFromInvoice } = require('../lib/nfse-factory');
 
-// Plans
+// Plans (mantidos caso precise em outros fluxos)
 const MONTHLY_PRICE_ID = process.env.STRIPE_PRICEID_MONTHLY;
 const ANNUAL_PRICE_ID  = process.env.STRIPE_PRICEID_ANNUAL;
 
 // util
-function addDays(date, days) {
-  const d = new Date(date);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d;
+function toDateFromUnix(ts) {
+  return ts ? new Date(ts * 1000) : null;
 }
 
 // emissão/consulta NFSe (assíncrono)
@@ -39,7 +37,7 @@ async function processaNFSe(ref, payload, tries = 6, delayMs = 10000) {
     }
     if (last?.data?.status === 'autorizado') {
       console.log('NFSe autorizada', ref, last.data?.numero, last.data?.url);
-      // TODO: persista numero, serie, url, xml_path
+      // TODO: persistir numero, serie, url, xml_path
     } else {
       console.error('NFSe não autorizada ou pendente', ref, last?.data);
     }
@@ -50,7 +48,6 @@ async function processaNFSe(ref, payload, tries = 6, delayMs = 10000) {
 
 // resolução de usuário: metadata → e-mail → legado
 async function resolverUsuarioPorStripe({ subscription, customer, invoice }) {
-  // 1) metadata.userId em subscription ou customer
   const metaUserId =
     subscription?.metadata?.userId ||
     customer?.metadata?.userId ||
@@ -61,7 +58,6 @@ async function resolverUsuarioPorStripe({ subscription, customer, invoice }) {
     if (byPk) return byPk;
   }
 
-  // 2) e-mail do invoice ou do customer
   const email =
     invoice?.customer_email ||
     customer?.email ||
@@ -74,7 +70,6 @@ async function resolverUsuarioPorStripe({ subscription, customer, invoice }) {
     if (byEmail) return byEmail;
   }
 
-  // 3) legado: stripeSubscriptionId
   const subId = subscription?.id || invoice?.subscription || null;
   if (subId) {
     const bySub = await User.findOne({ where: { stripeSubscriptionId: subId } });
@@ -102,7 +97,7 @@ router.post(
 
     switch (event.type) {
       // ————————————————————————————————————————————————————————————————
-      // CRIAÇÃO DE CHECKOUT: atualiza VIP, grava IDs e metadata no Stripe
+      // CHECKOUT CONCLUÍDO: não creditar tempo aqui; apenas vincular IDs e metadata
       // ————————————————————————————————————————————————————————————————
       case 'checkout.session.completed': {
         const session = event.data.object;
@@ -125,22 +120,13 @@ router.post(
           const user = await User.findOne({ where: { email: customerEmail } });
           if (!user) return res.status(404).send('Usuário não encontrado');
 
-          const now = new Date();
-          const newExpiration =
-            priceId === MONTHLY_PRICE_ID ? addDays(now, 30)
-          : priceId === ANNUAL_PRICE_ID  ? addDays(now, 365)
-          : null;
-
-          if (!newExpiration) return res.status(400).send('Plano não reconhecido');
-
+          // Apenas vincule IDs. NÃO atualize isVip/vipExpirationDate aqui.
           await user.update({
-            isVip: true,
-            vipExpirationDate: newExpiration,
-            stripeSubscriptionId: session.subscription || null,
-            stripeCustomerId: session.customer || null,
+            stripeSubscriptionId: session.subscription || user.stripeSubscriptionId || null,
+            stripeCustomerId: session.customer || user.stripeCustomerId || null,
           });
 
-          // grava metadados estáveis no Stripe (chave por id interno)
+          // Escreve metadados estáveis no Stripe
           try {
             if (session.subscription) {
               await stripe.subscriptions.update(session.subscription, {
@@ -156,16 +142,18 @@ router.post(
             console.error('Falha ao atualizar metadata no Stripe', e);
           }
 
+          // E-mail de confirmação pode ser mantido
           await sendConfirmationEmail(customerEmail);
           return res.status(200).send({ received: true });
         } catch (err) {
-          console.error('Erro ao atualizar usuário:', err);
-          return res.status(500).send('Erro ao atualizar usuário');
+          console.error('Erro ao tratar checkout.session.completed:', err);
+          return res.status(500).send('Erro ao tratar checkout.session.completed');
         }
       }
 
       // ————————————————————————————————————————————————————————————————
-      // FATURA PAGA: prorroga VIP, emite NFSe, usa resolução robusta do usuário
+      // FATURA PAGA: única fonte de verdade para concessão/renovação de VIP
+      // Define expiração = current_period_end da assinatura
       // ————————————————————————————————————————————————————————————————
       case 'invoice.paid': {
         const invoice = event.data.object;
@@ -192,48 +180,32 @@ router.post(
               ? await stripe.customers.retrieve(subscription.customer)
               : subscription.customer;
 
-          // resolve usuário: metadata → e-mail → legado
           const user = await resolverUsuarioPorStripe({ subscription, customer, invoice });
           if (!user) {
             console.error('Usuário não resolvido no invoice.paid');
             return res.status(404).send('Usuário não encontrado');
           }
 
-          // identifica plano
-          const priceId =
-            subscription.items?.data?.[0]?.price?.id ||
-            invoice.lines?.data?.[0]?.price?.id ||
-            null;
-
-          if (!priceId) {
-            console.error('priceId não identificado no invoice.paid');
-            return res.status(400).send('priceId não identificado');
+          // Use o período oficial da Stripe (evita +60 dias no primeiro ciclo)
+          const periodEnd = toDateFromUnix(subscription.current_period_end);
+          if (!periodEnd) {
+            console.error('current_period_end ausente na assinatura');
+            return res.status(400).send('Período da assinatura indisponível');
           }
 
-          let daysToAdd = null;
-          if (priceId === MONTHLY_PRICE_ID) daysToAdd = 30;
-          else if (priceId === ANNUAL_PRICE_ID) daysToAdd = 365;
-          else {
-            console.error('priceId não mapeado:', priceId);
-            return res.status(400).send('Plano não reconhecido');
-          }
-
-          const now = new Date();
-          const anchor =
-            user.vipExpirationDate && new Date(user.vipExpirationDate) > now
-              ? new Date(user.vipExpirationDate)
-              : now;
-
-          const newExpiration = addDays(anchor, daysToAdd);
+          // Não reduzir validade se houver data futura maior já registrada
+          const currentExp = user.vipExpirationDate ? new Date(user.vipExpirationDate) : null;
+          const newExpiration =
+            currentExp && currentExp > periodEnd ? currentExp : periodEnd;
 
           await user.update({
             isVip: true,
             vipExpirationDate: newExpiration,
-            stripeSubscriptionId: subscriptionId,           // sincroniza
-            stripeCustomerId: customer?.id || null,         // grava também
+            stripeSubscriptionId: subscriptionId,
+            stripeCustomerId: customer?.id || user.stripeCustomerId || null,
           });
 
-          console.log(`VIP prorrogado (+${daysToAdd}d) para: ${user.email}`);
+          console.log(`VIP definido até ${newExpiration.toISOString()} para: ${user.email}`);
 
           // NFSe (assíncrono, idempotência por invoice.id)
           try {
@@ -296,13 +268,12 @@ router.post(
       }
 
       // ————————————————————————————————————————————————————————————————
-      // SINCRONISMO EXTRA: cria/atualiza assinatura → grava metadata e ids
+      // SINCRONISMO: garante metadata e IDs em create/update de assinatura
       // ————————————————————————————————————————————————————————————————
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const subscription = event.data.object;
         try {
-          // garante metadata com userId quando já houver stripeCustomerId local
           const cust =
             typeof subscription.customer === 'string'
               ? await stripe.customers.retrieve(subscription.customer)
@@ -311,7 +282,6 @@ router.post(
           const user = await resolverUsuarioPorStripe({ subscription, customer: cust });
 
           if (user) {
-            // metadata idempotente
             try {
               await stripe.subscriptions.update(subscription.id, {
                 metadata: { userId: String(user.id), ...(subscription.metadata || {}) }
@@ -325,7 +295,6 @@ router.post(
               console.error('Falha ao atualizar metadata no sync de assinatura', metaErr);
             }
 
-            // vincula ids localmente
             await user.update({
               stripeSubscriptionId: subscription.id,
               stripeCustomerId: cust?.id || user.stripeCustomerId || null,
