@@ -2,7 +2,7 @@ import { Eye } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface PreviewButtonProps {
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
 }
 
 export function PreviewButton({ onClick }: PreviewButtonProps) {

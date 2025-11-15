@@ -27,46 +27,35 @@ export function PreviewModal({ imageUrl, onClose, contentName }: PreviewModalPro
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-md animate-fadeIn"
       onClick={onClose}
     >
       <div
         className={`
-          relative w-full h-full max-h-full max-w-full overflow-y-auto p-6 rounded-none
-          ${theme === 'dark' ? 'bg-gray-900' : 'bg-white'}
+          relative w-[90vw] max-w-[600px] h-auto max-h-[80vh]
+          md:w-[80vw] md:max-w-[800px] md:max-h-[85vh]
+          rounded-xl shadow-2xl overflow-hidden
+          animate-scaleIn
+          ${theme === 'dark' ? 'bg-gray-900/95' : 'bg-white/95'}
         `}
         onClick={(e) => e.stopPropagation()}
       >
-        <div
-          className={`flex items-center justify-between pb-4 mb-4 border-b ${
-            theme === 'dark' ? 'border-gray-700' : 'border-gray-300'
-          }`}
+        <button
+          onClick={onClose}
+          className={`
+            absolute top-4 right-4 z-10 p-2 rounded-full transition-all duration-200
+            ${theme === 'dark'
+              ? 'bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-white'
+              : 'bg-gray-100/80 hover:bg-gray-200 text-gray-600 hover:text-gray-900'}
+          `}
         >
-          <h3
-            className={`text-xl font-semibold ${
-              theme === 'dark' ? 'text-white' : 'text-gray-900'
-            }`}
-          >
-            {contentName ? `Preview — ${contentName}` : 'Preview'}
-          </h3>
-
-          <button
-            onClick={onClose}
-            className={`
-              p-2 rounded-md
-              ${theme === 'dark'
-                ? 'hover:bg-gray-800 text-gray-300 hover:text-white'
-                : 'hover:bg-gray-100 text-gray-600 hover:text-gray-900'}
-            `}
-          >
-            <X size={28} />
-          </button>
-        </div>
+          <X size={24} />
+        </button>
 
         <img
           src={imageUrl}
           alt={contentName || 'Preview'}
-          className="w-full h-auto max-h-[calc(100vh-100px)] object-contain rounded-lg mx-auto"
+          className="w-full h-full object-contain"
           onError={(e) => {
             const t = e.target as HTMLImageElement;
             t.src =

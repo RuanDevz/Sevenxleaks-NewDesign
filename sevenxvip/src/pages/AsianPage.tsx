@@ -70,7 +70,8 @@ const AsianPage: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedMonth, setSelectedMonth] = useState("");
-      const [showPreview, setShowPreview] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState<string | null>(null);
+  const [previewContentName, setPreviewContentName] = useState<string>("");
 
   
 
@@ -377,13 +378,32 @@ const AsianPage: React.FC = () => {
                                                     </span>
                                                   )}
                                                   <span className={`inline-flex items-center px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm font-medium rounded-full border backdrop-blur-sm font-roboto ${
-                                                    isDark 
+                                                    isDark
                                                       ? 'bg-gray-700/70 text-gray-300 border-gray-600/50'
                                                       : 'bg-gray-200/70 text-gray-700 border-gray-300/50'
                                                   }`}>
                                                     <i className="fa-solid fa-tag mr-1 sm:mr-2 text-xs"></i>
                                                     {link.category}
                                                   </span>
+                                                  {link.preview && (
+                                                    <button
+                                                      onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        setShowPreview(link.preview!);
+                                                        setPreviewContentName(link.name);
+                                                      }}
+                                                      className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
+                                                        isDark
+                                                          ? 'bg-gray-800 hover:bg-gray-700 text-blue-400'
+                                                          : 'bg-gray-100 hover:bg-gray-200 text-blue-600'
+                                                      }`}
+                                                      aria-label="Preview"
+                                                      title="View preview"
+                                                    >
+                                                      <i className="fa-solid fa-eye text-sm"></i>
+                                                    </button>
+                                                  )}
                                                 </div>
                                               </div>
                                             </motion.div>
@@ -438,6 +458,17 @@ const AsianPage: React.FC = () => {
           )}
         </main>
       </div>
+
+      {showPreview && (
+        <PreviewModal
+          imageUrl={showPreview}
+          contentName={previewContentName}
+          onClose={() => {
+            setShowPreview(null);
+            setPreviewContentName("");
+          }}
+        />
+      )}
     </div>
   );
 };
