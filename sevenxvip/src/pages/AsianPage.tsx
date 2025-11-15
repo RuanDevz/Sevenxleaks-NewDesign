@@ -7,6 +7,8 @@ import { Helmet } from "react-helmet";
 import { useTheme } from "../contexts/ThemeContext";
 import MonthFilter from "../components/MonthFilter";
 import CategoryFilter from "../components/CategoryFilter";
+import { PreviewButton } from "../components/PreviewButton";
+import { PreviewModal } from "../components/PreviewModal";
 
 type LinkItem = {
   id: string;
@@ -14,6 +16,7 @@ type LinkItem = {
   category: string;
   postDate: string;
   slug: string;
+  preview?: string;
   thumbnail?: string;
   createdAt: string;
   contentType?: string;
@@ -67,6 +70,10 @@ const AsianPage: React.FC = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedMonth, setSelectedMonth] = useState("");
+      const [showPreview, setShowPreview] = useState<string | null>(null);
+
+  
+
 
   function decodeModifiedBase64<T>(encodedStr: string): T {
     const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
@@ -380,11 +387,14 @@ const AsianPage: React.FC = () => {
                                                 </div>
                                               </div>
                                             </motion.div>
+
                                            </Link>
                                             ))}
                                         </div>
                                       </div>
                                     ))}
+
+                                    
 
               {hasMoreContent && (
                 <div className="text-center mt-12 py-8">
@@ -401,6 +411,7 @@ const AsianPage: React.FC = () => {
                           : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 shadow-lg hover:shadow-purple-500/20'
                     } text-white`}
                   >
+                    
                     {loadingMore ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block mr-2" />
@@ -409,8 +420,11 @@ const AsianPage: React.FC = () => {
                     ) : (
                       'Load More Content'
                     )}
+                    
                   </motion.button>
                 </div>
+
+                
               )}
             </>
           ) : (

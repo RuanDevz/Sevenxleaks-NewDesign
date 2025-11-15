@@ -17,6 +17,8 @@ import { Helmet } from "react-helmet";
 import { motion } from "framer-motion";
 import LoadingAsian from "./Loaders/LoadingAsian";
 import { useTheme } from "../contexts/ThemeContext";
+import { PreviewButton } from "./PreviewButton";
+import { PreviewModal } from "./PreviewModal";
 
 type ContentItem = {
   id: number;
@@ -30,6 +32,7 @@ type ContentItem = {
   linkMV3: string;
   linkMV4: string
   category: string;
+  preview?: string;
   postDate: string;
   createdAt: string;
   updatedAt: string;
@@ -45,6 +48,10 @@ const asianContentDetails = () => {
   const [error, setError] = useState<string | null>(null);
   const [linkvertiseAccount, setLinkvertiseAccount] = useState<string>("518238");
   const [benefitsOpen, setBenefitsOpen] = useState<boolean>(false);
+  const [showPreview, setShowPreview] = useState<boolean>(false);
+
+
+  
 
   // useEffect(() => {
   //   const fetchLinkvertiseConfig = async () => {
@@ -305,6 +312,25 @@ const asianContentDetails = () => {
                 <Tag className="w-4 h-4" />
                 <span className="font-medium text-sm break-words">{content.category}</span>
               </motion.div>
+{content.preview && (
+  <motion.div
+    initial={{ opacity: 0, x: 20 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ delay: 0.5 }}
+    className="relative"
+  >
+    <PreviewButton onClick={() => setShowPreview(true)} />
+
+    {showPreview && (
+      <PreviewModal
+        imageUrl={content.preview}
+        contentName={content.name}
+        onClose={() => setShowPreview(false)}
+      />
+    )}
+  </motion.div>
+)}
+
             </div>
           </div>
 
