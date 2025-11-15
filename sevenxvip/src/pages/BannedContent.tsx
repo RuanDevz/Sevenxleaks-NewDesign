@@ -8,6 +8,7 @@ import { Helmet } from "react-helmet";
 import LoadingBanned from "../components/Loaders/LoadingBanned";
 import MonthFilter from "../components/MonthFilter";
 import SortFilter, { SortValue } from "../components/SortFilter";
+import { PreviewModal } from "../components/PreviewModal";
 
 type LinkItem = {
   id: string;
@@ -19,6 +20,7 @@ type LinkItem = {
   mega2?: string;
   pixeldrain?: string;
   thumbnail?: string;
+  preview?: string;
   createdAt: string;
   region: string;
   contentType?: string;
@@ -39,6 +41,8 @@ const BannedContent: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const [showPreview, setShowPreview] = useState<string | null>(null);
+  const [previewContentName, setPreviewContentName] = useState<string>("");
 
   function decodeModifiedBase64<T>(encodedStr: string): T {
     const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
@@ -391,6 +395,25 @@ const BannedContent: React.FC = () => {
                                     <i className="fa-solid fa-ban mr-1 sm:mr-2 text-xs" />
                                     {link.category}
                                   </span>
+                                  {link.preview && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setShowPreview(link.preview!);
+                                        setPreviewContentName(link.name);
+                                      }}
+                                      className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
+                                        isDark
+                                          ? 'bg-gray-800 hover:bg-gray-700 text-blue-400'
+                                          : 'bg-gray-100 hover:bg-gray-200 text-blue-600'
+                                      }`}
+                                      aria-label="Preview"
+                                      title="View preview"
+                                    >
+                                      <i className="fa-solid fa-eye text-sm"></i>
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </motion.div>
@@ -443,6 +466,17 @@ const BannedContent: React.FC = () => {
           </main>
         </div>
       </div>
+
+      {showPreview && (
+        <PreviewModal
+          imageUrl={showPreview}
+          contentName={previewContentName}
+          onClose={() => {
+            setShowPreview(null);
+            setPreviewContentName("");
+          }}
+        />
+      )}
     </div>
   );
 };

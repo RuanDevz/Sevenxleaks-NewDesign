@@ -8,6 +8,7 @@ import VIPHeader from "../components/VIP/VIPHeader";
 import { useTheme } from "../contexts/ThemeContext";
 import MonthFilter from "../components/MonthFilter";
 import CategoryFilter from "../components/CategoryFilter";
+import { PreviewModal } from "../components/PreviewModal";
 
 type LinkItem = {
   id: string;
@@ -16,6 +17,7 @@ type LinkItem = {
   postDate: string;
   slug: string;
   thumbnail?: string;
+  preview?: string;
   createdAt: string;
   contentType?: string;
 };
@@ -42,6 +44,8 @@ const VIPAsianPage: React.FC = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const [showPreview, setShowPreview] = useState<string | null>(null);
+  const [previewContentName, setPreviewContentName] = useState<string>("");
 
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [filteredLinks, setFilteredLinks] = useState<LinkItem[]>([]);
@@ -70,6 +74,7 @@ const VIPAsianPage: React.FC = () => {
   postDate: string;
   slug: string;
   thumbnail?: string;
+  preview?: string;
   createdAt: string;
   contentType?: string;
 };
@@ -420,6 +425,25 @@ const VIPAsianPage: React.FC = () => {
       <Crown className="w-3 h-3 mr-2" />
       {link.category}
     </span>
+    {link.preview && (
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setShowPreview(link.preview!);
+          setPreviewContentName(link.name);
+        }}
+        className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
+          isDark
+            ? 'bg-gray-800 hover:bg-gray-700 text-yellow-400'
+            : 'bg-gray-100 hover:bg-gray-200 text-yellow-600'
+        }`}
+        aria-label="Preview"
+        title="View preview"
+      >
+        <i className="fa-solid fa-eye text-sm"></i>
+      </button>
+    )}
   </div>
 </div>
 
@@ -476,6 +500,17 @@ const VIPAsianPage: React.FC = () => {
           )}
         </main>
       </div>
+
+      {showPreview && (
+        <PreviewModal
+          imageUrl={showPreview}
+          contentName={previewContentName}
+          onClose={() => {
+            setShowPreview(null);
+            setPreviewContentName("");
+          }}
+        />
+      )}
     </div>
   );
 };

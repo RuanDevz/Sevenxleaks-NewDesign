@@ -9,7 +9,7 @@ import {
   Shield,
   Crown,
   ChevronDown,
-  AlertTriangle,
+  Globe,
 } from "lucide-react";
 import DownloadOptions from "../components/DownloadOptions";
 import { linkvertise } from "../components/Linkvertise";
@@ -17,6 +17,7 @@ import { Helmet } from "react-helmet";
 import { motion } from "framer-motion";
 import LoadingWestern from "../components/Loaders/LoadingWestern";
 import { useTheme } from "../contexts/ThemeContext";
+import { PreviewModal } from "../components/PreviewModal";
 
 type ContentItem = {
   id: number;
@@ -28,12 +29,13 @@ type ContentItem = {
   linkMV1: string;
   linkMV2: string;
   linkMV3: string;
-  linkMV4: string
+  linkMV4: string;
   category: string;
   postDate: string;
   createdAt: string;
   updatedAt: string;
   slug: string;
+  preview?: string;
 };
 
 const WesternContentDetails = () => {
@@ -45,21 +47,7 @@ const WesternContentDetails = () => {
   const [error, setError] = useState<string | null>(null);
   const [linkvertiseAccount, setLinkvertiseAccount] = useState<string>("518238");
   const [benefitsOpen, setBenefitsOpen] = useState<boolean>(false);
-
-  // useEffect(() => {
-  //   const fetchLinkvertiseConfig = async () => {
-  //     try {
-  //       const response = await axios.get(
-  //         `${import.meta.env.VITE_BACKEND_URL}/linkvertise-config`,
-  //         { headers: { "x-api-key": `${import.meta.env.VITE_FRONTEND_API_KEY}` } }
-  //       );
-  //       if (response.data && response.data.activeAccount) setLinkvertiseAccount(response.data.activeAccount);
-  //     } catch {
-  //       setLinkvertiseAccount("518238");
-  //     }
-  //   };
-  //   fetchLinkvertiseConfig();
-  // }, []);
+  const [showPreview, setShowPreview] = useState<string | null>(null);
 
   useEffect(() => {
     if (content) {
@@ -67,59 +55,51 @@ const WesternContentDetails = () => {
     }
   }, [content, linkvertiseAccount]);
 
-  function decodeModifiedBase64(encodedStr: string): any {
-    const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
-    const jsonString = atob(fixedBase64);
-    return JSON.parse(jsonString);
-  }
-
   useEffect(() => {
-    const fetchContentDetails = async () => {
+    const fetchContent = async () => {
       try {
-        setLoading(true);
         const response = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/westerncontent/${slug}`,
-          { headers: { "x-api-key": `${import.meta.env.VITE_FRONTEND_API_KEY}` } }
+          `${import.meta.env.VITE_BACKEND_URL}/western/${slug}`,
+          {
+            headers: {
+              "x-api-key": `${import.meta.env.VITE_FRONTEND_API_KEY}`,
+              Authorization: `Bearer ${localStorage.getItem("Token")}`,
+            },
+          }
         );
-        if (!response.data || !response.data.data) throw new Error("Resposta inválida do servidor");
-        const decodedContent = decodeModifiedBase64(response.data.data);
-        setContent(decodedContent);
-      } catch {
-        setError("Failed to load content details. Please try again later.");
+
+        if (response.data) {
+          setContent(response.data);
+        } else {
+          setError("Content not found");
+        }
+      } catch (err: any) {
+        console.error("Error fetching content:", err);
+        setError(err.response?.data?.message || "An error occurred");
       } finally {
         setLoading(false);
       }
     };
-    if (slug) fetchContentDetails();
-  }, [slug]);
 
-  const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    if (slug) fetchContent();
+  }, [slug]);
 
   if (loading) return <LoadingWestern />;
 
   if (error) {
     return (
-      <div className={`min-h-screen flex items-center justify-center p-4 ${
-        isDark 
-          ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' 
-          : 'bg-gradient-to-br from-gray-50 via-white to-gray-100'
+      <div className={`min-h-screen flex items-center justify-center ${
+        isDark ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'
       }`}>
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className={`max-w-md backdrop-blur-xl border rounded-2xl p-8 text-center shadow-2xl ${
-          isDark 
-            ? 'bg-gray-800/90 border-gray-700' 
-            : 'bg-white/90 border-gray-200'
-        }`}>
-          <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Shield className="w-8 h-8 text-orange-400" />
-          </div>
-          <h2 className={`text-2xl font-bold mb-4 ${
-            isDark ? 'text-white' : 'text-gray-900'
-          }`}>Error</h2>
-          <p className={`mb-6 ${
-            isDark ? 'text-gray-300' : 'text-gray-600'
-          }`}>{error}</p>
-          <Link to="/western" className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-semibold transition-all duration-300">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center px-6 py-12 max-w-md rounded-2xl"
+        >
+          <Globe className="w-20 h-20 mx-auto mb-6 text-orange-500" />
+          <h2 className="text-3xl font-bold mb-4">Content Not Found</h2>
+          <p className="mb-8 text-gray-500">The western content you're looking for doesn't exist or has been removed.</p>
+          <Link to="/western" className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-semibold transition-all duration-300">
             <ArrowLeft className="w-4 h-4" />
             Back to western content
           </Link>
@@ -128,35 +108,7 @@ const WesternContentDetails = () => {
     );
   }
 
-  if (!content) {
-    return (
-      <div className={`min-h-screen flex items-center justify-center p-4 ${
-        isDark 
-          ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' 
-          : 'bg-gradient-to-br from-gray-50 via-white to-gray-100'
-      }`}>
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className={`max-w-md backdrop-blur-xl border rounded-2xl p-8 text-center shadow-2xl ${
-          isDark 
-            ? 'bg-gray-800/90 border-gray-700' 
-            : 'bg-white/90 border-gray-200'
-        }`}>
-          <div className="w-16 h-16 bg-gray-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertTriangle className="w-8 h-8 text-gray-400" />
-          </div>
-          <h2 className={`text-2xl font-bold mb-4 ${
-            isDark ? 'text-white' : 'text-gray-900'
-          }`}>Content Not Found</h2>
-          <p className={`mb-6 ${
-            isDark ? 'text-gray-300' : 'text-gray-600'
-          }`}>The western content you're looking for doesn't exist or has been removed.</p>
-          <Link to="/western" className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white rounded-xl font-semibold transition-all duration-300">
-            <ArrowLeft className="w-4 h-4" />
-            Back to western content
-          </Link>
-        </motion.div>
-      </div>
-    );
-  }
+  if (!content) return null;
 
   return (
     <div className={`relative min-h-screen overflow-x-clip ${
@@ -167,178 +119,251 @@ const WesternContentDetails = () => {
       <Helmet>
         <title>Sevenxleaks - {content.name} (western)</title>
         <link rel="canonical" href={`https://sevenxleaks.com/western/${content.slug}`} />
-        {/* Corte global e neutralização de 100vw */}
         <style>{`
-          html, body, #root { max-width: 100%; overflow-x: hidden; }
-          .linkvertise-container, [data-ads], iframe { width: 100% !important; max-width: 100% !important; }
-          * { word-break: break-word; }
+          html, body {
+            overflow-x: hidden !important;
+            width: 100%;
+            max-width: 100vw;
+          }
+          * {
+            max-width: 100%;
+          }
         `}</style>
       </Helmet>
 
-      {/* Background Effects contidos e centralizados */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className={`absolute inset-0 ${
-          isDark 
-            ? 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-orange-900/20 via-gray-900 to-gray-900'
-            : 'bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-orange-100/30 via-white to-gray-50'
-        }`} />
-        <div className={`absolute top-1/4 left-1/2 -translate-x-1/2 w-64 h-64 sm:w-96 sm:h-96 rounded-full blur-3xl animate-pulse ${
-          isDark ? 'bg-orange-500/10' : 'bg-orange-200/30'
-        }`} />
-        <div className={`absolute bottom-1/4 left-1/2 -translate-x-1/2 w-64 h-64 sm:w-96 sm:h-96 rounded-full blur-3xl animate-pulse ${
-          isDark ? 'bg-orange-500/10' : 'bg-orange-200/30'
-        }`} />
-      </div>
-
-      <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Back Button */}
-        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="mb-6">
-          <Link to="/western" className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800/60 hover:bg-gray-700/80 border border-gray-700 hover:border-orange-500/50 rounded-xl text-gray-300 hover:text-white transition-all duration-300 backdrop-blur-sm shadow-lg hover:shadow-orange-500/10">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">Back to western content</span>
+      <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        <motion.div
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mb-8"
+        >
+          <Link
+            to="/western"
+            className={`inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl ${
+              isDark
+                ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white'
+                : 'bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white'
+            }`}
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span>Back to Western Content</span>
           </Link>
         </motion.div>
 
-        {/* Content Card */}
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className={`backdrop-blur-xl border rounded-2xl overflow-hidden shadow-2xl ${
-          isDark 
-            ? 'bg-gray-800/90 border-orange-500/30 shadow-orange-500/10'
-            : 'bg-white/90 border-orange-400/30 shadow-orange-400/10'
-        }`}>
-          {/* Header */}
-          <div className={`px-6 py-6 border-b ${
-            isDark 
-              ? 'bg-gradient-to-r from-orange-900/40 to-orange-800/40 border-orange-500/20'
-              : 'bg-gradient-to-r from-orange-100/40 to-orange-200/40 border-orange-400/20'
-          }`}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-orange-500 rounded-xl flex items-center justify-center shadow-xl">
-                <AlertTriangle className="w-5 h-5 text-white" />
-              </div>
-              <div className={`flex items-center gap-2 px-2 sm:px-3 py-1 rounded-full border backdrop-blur-sm ${
-                isDark 
-                  ? 'bg-orange-500/20 text-orange-300 border-orange-500/30'
-                  : 'bg-orange-200/40 text-orange-700 border-orange-400/40'
-              }`}>
-                <Shield className="w-3 h-3" />
-                <span className="font-bold text-xs hidden sm:inline">WESTERN CONTENT</span>
-                <span className="font-bold text-xs sm:hidden">WESTERN</span>
-              </div>
-            </div>
-
-            <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className={`text-xl sm:text-3xl font-bold mb-4 leading-tight break-words ${
-              isDark ? 'text-white' : 'text-gray-900'
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className={`backdrop-blur-xl border rounded-3xl p-6 sm:p-10 shadow-2xl ${
+            isDark
+              ? 'bg-gray-800/60 border-orange-500/30 shadow-orange-500/10'
+              : 'bg-white/80 border-orange-400/40 shadow-orange-400/10'
+          }`}
+        >
+          <div className="flex items-center gap-4 mb-8">
+            <div className={`p-4 rounded-2xl ${
+              isDark ? 'bg-orange-500/20' : 'bg-orange-100'
             }`}>
-              {content.name}
-            </motion.h1>
-
-            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className={`flex items-center gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border backdrop-blur-sm ${
-                isDark 
-                  ? 'bg-gray-700/50 border-gray-600/50'
-                  : 'bg-gray-200/50 border-gray-300/50'
+              <Globe className={`w-8 h-8 ${
+                isDark ? 'text-orange-400' : 'text-orange-600'
+              }`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className={`text-2xl sm:text-4xl font-black mb-2 break-words ${
+                isDark
+                  ? 'text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600'
+                  : 'text-transparent bg-clip-text bg-gradient-to-r from-orange-600 via-orange-700 to-orange-800'
               }`}>
-                <Calendar className="w-4 h-4 text-orange-400" />
-                <span className={`text-xs sm:text-sm ${
-                  isDark ? 'text-gray-300' : 'text-gray-700'
-                }`}>{formatDate(content.postDate)}</span>
-              </motion.div>
-
-              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }} className={`flex items-center gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border backdrop-blur-sm ${
-                isDark 
-                  ? 'bg-orange-500/20 text-orange-300 border-orange-500/30'
-                  : 'bg-orange-200/40 text-orange-700 border-orange-400/40'
-              }`}>
-                <Tag className="w-4 h-4" />
-                <span className="font-medium text-xs sm:text-sm break-words">{content.category}</span>
-              </motion.div>
+                {content.name}
+              </h1>
             </div>
           </div>
 
-          {/* Download Section */}
-          <div className="p-6">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
-              <div className="w-full max-w-full overflow-hidden">
-<DownloadOptions
-  primaryLinks={{
-    linkG: content.link,     // MEGA (vertise)
-    linkP: content.linkG,    // MEGA 2 (vertise)
-    pixeldrain: content.linkP, // Pixeldrain (vertise)
-
-    LINKMV1: content.linkMV1, // MEGA (admaven)
-    LINKMV2: content.linkMV2, // MEGA 2 (admaven)
-    LINKMV3: content.linkMV3, // Pixeldrain (admaven)
-  }}
-/>
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              className={`flex items-center gap-3 p-4 rounded-xl border backdrop-blur-sm ${
+                isDark
+                  ? 'bg-gray-700/50 border-orange-500/20'
+                  : 'bg-gray-50/50 border-orange-400/30'
+              }`}
+            >
+              <Calendar className={`w-5 h-5 flex-shrink-0 ${
+                isDark ? 'text-orange-400' : 'text-orange-600'
+              }`} />
+              <div className="min-w-0 flex-1">
+                <p className={`text-xs font-medium ${
+                  isDark ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                  Posted On
+                </p>
+                <p className={`text-sm font-bold truncate ${
+                  isDark ? 'text-white' : 'text-gray-900'
+                }`}>
+                  {new Date(content.postDate).toLocaleDateString()}
+                </p>
               </div>
             </motion.div>
 
-            {/* VIP Upgrade Section */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }} className={`mt-6 rounded-xl p-4 w-full max-w-full border ${
-              isDark 
-                ? 'bg-gradient-to-r from-yellow-500/10 to-yellow-600/10 border-yellow-500/30'
-                : 'bg-gradient-to-r from-yellow-100/50 to-yellow-200/50 border-yellow-400/40'
-            }`}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-lg flex items-center justify-center shadow-lg">
-                    <Crown className="w-4 h-4 text-black" />
-                  </div>
-                  <h3 className={`text-base sm:text-lg font-bold ${
-                    isDark ? 'text-yellow-400' : 'text-yellow-600'
-                  }`}>Upgrade to VIP</h3>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setBenefitsOpen((v) => !v)}
-                  aria-expanded={benefitsOpen}
-                  aria-controls="vip-benefits"
-                  className={`inline-flex items-center gap-2 px-2 sm:px-3 py-1.5 border rounded-md text-xs font-medium transition-all ${
-                    isDark 
-                      ? 'bg-yellow-500/15 border-yellow-500/30 text-yellow-300'
-                      : 'bg-yellow-200/30 border-yellow-400/40 text-yellow-700'
-                  }`}
-                >
-                  <span className="hidden sm:inline">{benefitsOpen ? "Hide benefits" : "Show benefits"}</span>
-                  <span className="sm:hidden">{benefitsOpen ? "Hide" : "Show"}</span>
-                  <ChevronDown className={`w-4 h-4 transition-transform ${benefitsOpen ? "rotate-180" : ""}`} />
-                </button>
+            <motion.div
+              whileHover={{ scale: 1.02 }}
+              className={`flex items-center gap-3 p-4 rounded-xl border backdrop-blur-sm ${
+                isDark
+                  ? 'bg-gray-700/50 border-orange-500/20'
+                  : 'bg-gray-50/50 border-orange-400/30'
+              }`}
+            >
+              <Tag className={`w-5 h-5 flex-shrink-0 ${
+                isDark ? 'text-orange-400' : 'text-orange-600'
+              }`} />
+              <div className="min-w-0 flex-1 flex items-center gap-2">
+                <p className={`text-xs font-medium ${
+                  isDark ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                  Category
+                </p>
+                <p className={`text-sm font-bold truncate ${
+                  isDark ? 'text-white' : 'text-gray-900'
+                }`}>
+                  {content.category}
+                </p>
+                {content.preview && (
+                  <button
+                    onClick={() => setShowPreview(content.preview!)}
+                    className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 ${
+                      isDark
+                        ? 'bg-gray-800 hover:bg-gray-700 text-blue-400'
+                        : 'bg-gray-100 hover:bg-gray-200 text-blue-600'
+                    }`}
+                    aria-label="Preview"
+                    title="View preview"
+                  >
+                    <i className="fa-solid fa-eye text-sm"></i>
+                  </button>
+                )}
               </div>
+            </motion.div>
+          </div>
 
-              <div
-                id="vip-benefits"
-                className={`grid grid-cols-2 gap-2 mb-4 overflow-hidden transition-all duration-300 w-full max-w-full ${
-                  benefitsOpen ? "max-h-96 opacity-100 mt-1" : "max-h-0 opacity-0"
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className={`rounded-2xl p-6 border mb-8 ${
+              isDark
+                ? 'bg-gradient-to-br from-orange-900/20 to-orange-800/10 border-orange-500/30'
+                : 'bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-300/50'
+            }`}
+          >
+            <div className="flex items-center gap-3 mb-6">
+              <Shield className={`w-6 h-6 ${
+                isDark ? 'text-orange-400' : 'text-orange-600'
+              }`} />
+              <h2 className={`text-xl font-bold ${
+                isDark ? 'text-white' : 'text-gray-900'
+              }`}>
+                Download Options
+              </h2>
+            </div>
+
+            <DownloadOptions
+              primaryLinks={{
+                linkG: content.link,
+                linkP: content.linkG,
+                pixeldrain: content.linkP,
+                LINKMV1: content.linkMV1,
+                LINKMV2: content.linkMV2,
+                LINKMV3: content.linkMV3,
+              }}
+            />
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            <button
+              onClick={() => setBenefitsOpen(!benefitsOpen)}
+              className={`w-full flex items-center justify-between p-6 rounded-2xl border transition-all duration-300 ${
+                isDark
+                  ? 'bg-gradient-to-r from-yellow-900/20 to-yellow-800/10 border-yellow-500/30 hover:border-yellow-400/50'
+                  : 'bg-gradient-to-r from-yellow-50 to-yellow-100/50 border-yellow-300/50 hover:border-yellow-400/60'
+              }`}
+            >
+              <div className="flex items-center gap-4">
+                <Crown className={`w-6 h-6 ${
+                  isDark ? 'text-yellow-400' : 'text-yellow-600'
+                }`} />
+                <span className={`text-lg font-bold ${
+                  isDark ? 'text-white' : 'text-gray-900'
+                }`}>
+                  Want VIP Benefits?
+                </span>
+              </div>
+              <ChevronDown
+                className={`w-5 h-5 transition-transform duration-300 ${
+                  benefitsOpen ? 'rotate-180' : ''
+                } ${isDark ? 'text-yellow-400' : 'text-yellow-600'}`}
+              />
+            </button>
+
+            {benefitsOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className={`mt-4 p-6 rounded-2xl border ${
+                  isDark
+                    ? 'bg-gray-700/50 border-yellow-500/20'
+                    : 'bg-yellow-50/50 border-yellow-300/30'
                 }`}
               >
-                {[
-                  "Instant access without ads",
-                  "All content unlocked",
-                  "Premium download speeds",
-                  "Exclusive VIP content",
-                ].map((benefit, index) => (
-                  <div key={index} className={`flex items-center gap-2 text-xs sm:text-sm ${
-                    isDark ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
-                    <div className="w-4 h-4 bg-green-500/20 rounded-full flex items-center justify-center">
-                      <i className="fa-solid fa-check text-green-400 text-xs"></i>
-                    </div>
-                    <span className="break-words">{benefit}</span>
-                  </div>
-                ))}
-              </div>
+                <ul className="space-y-3">
+                  {[
+                    'No ads or linkvertise',
+                    'Instant direct downloads',
+                    'Premium exclusive content',
+                    'Early access to new releases',
+                    'Priority support',
+                  ].map((benefit, index) => (
+                    <li key={index} className="flex items-center gap-3">
+                      <div className={`w-2 h-2 rounded-full ${
+                        isDark ? 'bg-yellow-400' : 'bg-yellow-600'
+                      }`} />
+                      <span className={isDark ? 'text-gray-300' : 'text-gray-700'}>
+                        {benefit}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
 
-              <Link to="/plans" className="inline-flex items-center gap-2 w-full justify-center px-4 py-2.5 bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-black font-bold rounded-lg transition-all duration-300 shadow-lg hover:shadow-yellow-500/30 text-xs sm:text-sm">
-                <Crown className="w-4 h-4" />
-                <span>Unlock VIP Access</span>
-                <ExternalLink className="w-4 h-4" />
-              </Link>
-            </motion.div>
-          </div>
+                <Link
+                  to="/plans"
+                  className={`mt-6 w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold transition-all duration-300 ${
+                    isDark
+                      ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black'
+                      : 'bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white'
+                  } shadow-lg hover:shadow-xl`}
+                >
+                  <Crown className="w-5 h-5" />
+                  <span>Upgrade to VIP</span>
+                  <ExternalLink className="w-4 h-4" />
+                </Link>
+              </motion.div>
+            )}
+          </motion.div>
         </motion.div>
       </div>
+
+      {showPreview && (
+        <PreviewModal
+          imageUrl={showPreview}
+          contentName={content.name}
+          onClose={() => setShowPreview(null)}
+        />
+      )}
     </div>
   );
 };
