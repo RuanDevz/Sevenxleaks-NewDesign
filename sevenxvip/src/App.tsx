@@ -21,6 +21,7 @@ import WesternContentDetails from "./pages/WesternContentDetails";
 import AsianContentDetails from "./components/AsianContentDetails";
 import AdminPainel from "./pages/AdminPainel";
 import AdminVipUsers from "./pages/AdminVipUsers";
+import AdminContentRequests from "./pages/AdminContentRequests";
 import SupportPage from "./pages/SupportPage";
 import ViewStats from "./pages/Viewstats";
 import ViewRequests from "./pages/ViewRequests";
@@ -40,6 +41,7 @@ import VIPWesternContentDetails from "./components/VIP/VIPWesternContentDetails"
 import VIPBannedContentDetails from "./pages/VIPBannedContentDetails";
 import VIPUnknownContentDetails from "./pages/VIPUnknownContentDetails";
 import VIPHeader from "./components/VIP/VIPHeader";
+import RecommendContent from "./pages/RecommendContent";
 
 const App = () => {
   const [hasPermission, setHasPermission] = useState({ vip: false, admin: false });
@@ -145,6 +147,17 @@ const App = () => {
               }
             />
 
+              <Route
+              path="/recommend"
+              element={
+                hasPermission.vip ? (
+                  <RecommendContent />
+                ) : (
+                  <AccessDenied message="You are not a VIP to access this page." />
+                )
+              }
+            />
+
             <Route
               path="/vip-western/:slug"
               element={
@@ -201,6 +214,12 @@ const App = () => {
               path="/admin/requests"
               element={
                 hasPermission.admin ? <ViewRequests /> : <AccessDenied message="You are not an administrator to access this page." />
+              }
+            />
+            <Route
+              path="/admin/content-requests"
+              element={
+                hasPermission.admin ? <AdminContentRequests /> : <AccessDenied message="You are not an administrator to access this page." />
               }
             />
             <Route

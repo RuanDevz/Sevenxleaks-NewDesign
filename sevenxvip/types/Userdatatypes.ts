@@ -24,7 +24,11 @@ export interface Userdatatypes {
   stripeSubscriptionId: string | null;
   profileImage: any,
   username: string,
-  createdAt: string
+  createdAt: string,
+  vipTier?: 'diamond' | 'titanium',
+  subscriptionType?: 'monthly' | 'annual',
+  requestTickets?: number,
+  requestTicketsResetDate?: string
 }
 
 

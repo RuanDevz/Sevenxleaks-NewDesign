@@ -120,10 +120,16 @@ router.post(
           const user = await User.findOne({ where: { email: customerEmail } });
           if (!user) return res.status(404).send('Usuário não encontrado');
 
+          // Extrair tier e tipo de subscrição dos metadados
+          const vipTier = session.metadata?.vipTier || 'diamond';
+          const subscriptionType = session.metadata?.subscriptionType || 'monthly';
+
           // Apenas vincule IDs. NÃO atualize isVip/vipExpirationDate aqui.
           await user.update({
             stripeSubscriptionId: session.subscription || user.stripeSubscriptionId || null,
             stripeCustomerId: session.customer || user.stripeCustomerId || null,
+            vipTier: vipTier,
+            subscriptionType: subscriptionType,
           });
 
           // Escreve metadados estáveis no Stripe
@@ -198,11 +204,30 @@ router.post(
           const newExpiration =
             currentExp && currentExp > periodEnd ? currentExp : periodEnd;
 
+          // Determinar quantidade de tickets baseado no tier e tipo de subscrição
+          const vipTier = subscription.metadata?.vipTier || user.vipTier || 'diamond';
+          const subscriptionType = subscription.metadata?.subscriptionType || user.subscriptionType || 'monthly';
+
+          let requestTickets = 0;
+          if (vipTier === 'diamond') {
+            requestTickets = subscriptionType === 'annual' ? 2 : 1;
+          } else if (vipTier === 'titanium') {
+            requestTickets = 5;
+          }
+
+          // Definir data de reset dos tickets (próximo mês)
+          const now = new Date();
+          const resetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
           await user.update({
             isVip: true,
             vipExpirationDate: newExpiration,
             stripeSubscriptionId: subscriptionId,
             stripeCustomerId: customer?.id || user.stripeCustomerId || null,
+            vipTier: vipTier,
+            subscriptionType: subscriptionType,
+            requestTickets: requestTickets,
+            requestTicketsResetDate: resetDate,
           });
 
           console.log(`VIP definido até ${newExpiration.toISOString()} para: ${user.email}`);

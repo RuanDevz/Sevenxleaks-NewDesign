@@ -216,7 +216,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
                   </div>
                   <div className="space-y-1">
                     <Link
-                      to="/admin/requests"
+                      to="/admin/content-requests"
                       className="flex items-center gap-3 px-3 py-3 hover:bg-gray-800/60 rounded-xl transition-all duration-200 group border border-transparent hover:border-gray-500/20 hover:shadow-lg hover:shadow-gray-500/10"
                       onClick={handleMenuToggle}
                     >

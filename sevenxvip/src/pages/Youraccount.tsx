@@ -86,7 +86,7 @@ const YourAccount: React.FC = () => {
       });
 
       const data = await response.json();
-      
+
       if (response.ok && data.url) {
         window.open(data.url, '_blank');
       } else {
@@ -97,6 +97,11 @@ const YourAccount: React.FC = () => {
       console.error('Erro ao criar sessão do portal:', error);
       alert('Erro ao acessar o portal de gerenciamento. Tente novamente.');
     }
+  };
+
+  const getVipTierDisplay = () => {
+    if (!userData?.isVip || !userData?.vipTier) return 'Free Member';
+    return userData.vipTier === 'titanium' ? 'VIP TITANIUM' : 'VIP DIAMOND';
   };
 
   if (loading) {
@@ -200,17 +205,21 @@ const YourAccount: React.FC = () => {
           {/* Status Badges */}
           <div className="flex items-center justify-center gap-4 mt-6">
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full border backdrop-blur-sm ${
-              userData.isVip 
-                ? isDark
-                  ? 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'
-                  : 'bg-yellow-100 border-yellow-300 text-yellow-700'
+              userData.isVip
+                ? userData.vipTier === 'titanium'
+                  ? isDark
+                    ? 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400'
+                    : 'bg-yellow-100 border-yellow-300 text-yellow-700'
+                  : isDark
+                    ? 'bg-blue-500/20 border-blue-500/30 text-blue-400'
+                    : 'bg-blue-100 border-blue-300 text-blue-700'
                 : isDark
                   ? 'bg-gray-700/50 border-gray-600/30 text-gray-400'
                   : 'bg-gray-200 border-gray-300 text-gray-600'
             }`}>
               <Crown className="w-4 h-4" />
               <span className="font-medium text-sm">
-                {userData.isVip ? 'VIP Member' : 'Free Member'}
+                {getVipTierDisplay()}
               </span>
             </div>
             

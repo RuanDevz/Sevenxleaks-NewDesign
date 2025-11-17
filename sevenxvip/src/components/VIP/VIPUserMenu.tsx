@@ -314,7 +314,7 @@ const VIPUserMenu: React.FC<VIPUserMenuProps> = ({
                   </div>
                   <div className="space-y-1">
                     <Link
-                      to="/admin/requests"
+                      to="/admin/content-requests"
                       className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group
                       ${
                         isDark

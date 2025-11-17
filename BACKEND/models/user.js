@@ -54,8 +54,27 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         defaultValue: [], 
       },
-      stripeSubscriptionId: { 
-        type: DataTypes.STRING, 
+      stripeSubscriptionId: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      vipTier: {
+        type: DataTypes.ENUM('diamond', 'titanium'),
+        allowNull: true,
+        defaultValue: null,
+      },
+      subscriptionType: {
+        type: DataTypes.ENUM('monthly', 'annual'),
+        allowNull: true,
+        defaultValue: null,
+      },
+      requestTickets: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        defaultValue: 0,
+      },
+      requestTicketsResetDate: {
+        type: DataTypes.DATE,
         allowNull: true,
       },
       isDisabled: {

@@ -5,10 +5,18 @@ const { User } = require('../models');
 const router = express.Router();
 
 router.post('/vip-payment', async (req, res) => {
-    const { email, planType } = req.body;
+    const { email, planType, vipTier } = req.body;
 
-    if (!email || !planType || !['monthly', 'annual'].includes(planType)) {
-        return res.status(400).json({ error: 'Dados inválidos. Verifique o email e o tipo de plano.' });
+    if (!email || !planType || !vipTier) {
+        return res.status(400).json({ error: 'Dados inválidos. Verifique o email, tipo de plano e tier VIP.' });
+    }
+
+    if (!['monthly', 'annual'].includes(planType)) {
+        return res.status(400).json({ error: 'Tipo de plano inválido. Use "monthly" ou "annual".' });
+    }
+
+    if (!['diamond', 'titanium'].includes(vipTier)) {
+        return res.status(400).json({ error: 'Tier VIP inválido. Use "diamond" ou "titanium".' });
     }
 
     try {
@@ -19,16 +27,25 @@ router.post('/vip-payment', async (req, res) => {
         }
 
         const prices = {
-            monthly: process.env.STRIPE_PRICEID_MONTHLY,
-            annual: process.env.STRIPE_PRICEID_ANNUAL,
+            diamond_monthly: process.env.STRIPE_PRICEID_MONTHLY,
+            diamond_annual: process.env.STRIPE_PRICEID_ANNUAL,
+            titanium_monthly: process.env.STRIPE_PRICEID_TITANIUM_MONTHLY,
+            titanium_annual: process.env.STRIPE_PRICEID_TITANIUM_ANNUAL,
         };
+
+        const priceKey = `${vipTier}_${planType}`;
+        const priceId = prices[priceKey];
+
+        if (!priceId) {
+            return res.status(400).json({ error: 'Combinação de plano não encontrada.' });
+        }
 
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             customer_email: email,
             line_items: [
               {
-                price: prices[planType],
+                price: priceId,
                 quantity: 1,
               },
             ],
@@ -36,7 +53,9 @@ router.post('/vip-payment', async (req, res) => {
             success_url: `${process.env.FRONTEND_URL}/success`,
             cancel_url: `${process.env.FRONTEND_URL}/cancel`,
             metadata: {
-              priceId: prices[planType],
+              priceId: priceId,
+              vipTier: vipTier,
+              subscriptionType: planType,
             },
           });
 
