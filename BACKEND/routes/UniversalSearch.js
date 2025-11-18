@@ -31,13 +31,11 @@ function encodePayloadToBase64(payload) {
 
 /** ==========================================
  *  Filtro de datas baseado em postDate (robusto)
- *  Suporta tanto os valores antigos quanto os novos.
  *  ========================================== */
 function createDateFilter(dateFilter, month) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Compatibilidade com valores do código antigo do usuário.
   const alias = {
     '7days': 'last7',
     all: undefined,
@@ -111,14 +109,12 @@ function createDateFilter(dateFilter, month) {
 
 /** ===================================
  *  Busca por modelo SEM paginação aqui
- *  + filtros textuais opcionais
  *  =================================== */
 async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categories, region) {
   const where = { ...whereClause };
 
   if (q) {
     const like = { [Op.iLike]: `%${q}%` };
-    // Ajuste aqui se precisar cobrir mais colunas
     where[Op.or] = [
       { name: like },
       { slug: like },
@@ -131,9 +127,11 @@ async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categor
   }
 
   if (region) {
-    // Só aplica se a coluna existir no schema
     where.region = region;
   }
+
+  // Para debugging local: log dos filtros
+  // console.debug('safeModelSearch where:', JSON.stringify(where));
 
   return model.findAll({
     where,
@@ -180,12 +178,16 @@ router.get('/search', async (req, res) => {
     ? String(req.query.categories).split(',').map(s => s.trim()).filter(Boolean)
     : (req.query.category ? [String(req.query.category).trim()] : undefined);
 
-  const dateFilter = req.query.dateFilter; // aceita today, yesterday, last7, last30, thisMonth, prevMonth, 7days, all
+  const dateFilter = req.query.dateFilter; // today, yesterday, last7, last30, thisMonth, prevMonth, 7days, all
   const month = req.query.month ? parseInt(req.query.month, 10) : undefined;
   const region = req.query.region ? String(req.query.region).trim() : undefined;
 
   // Filtro de fonte
   const contentType = (req.query.contentType || 'all').toString();
+
+  // DEBUG helpers
+  const wantRaw = String(req.query.raw || '0') === '1';
+  const wantDebug = String(req.query.debug || '0') === '1';
 
   try {
     const whereDate = createDateFilter(dateFilter, month);
@@ -196,11 +198,37 @@ router.get('/search', async (req, res) => {
       return src.key === contentType || src.contentType === contentType;
     });
 
+    console.info(`[UniversalSearch] selectedSources: ${selectedSources.map(s => s.key).join(', ') || '(none)'} | q:${q || '-'} | categories:${categories ? categories.join(',') : '-'} | region:${region || '-'}`);
+
     // Execução concorrente sem paginação por modelo
     const parts = await Promise.all(
       selectedSources.map(async (src) => {
-        const rows = await safeModelSearch(src.model, whereDate, sortBy, sortOrder, q, categories, region);
-        return rows.map(r => ({ ...r, contentType: src.contentType }));
+        try {
+          // log do where usado para esse model (útil para entender porque não retorna nada)
+          const wherePreview = { ...whereDate };
+          if (q) {
+            wherePreview._q = q;
+          }
+          if (categories && categories.length) {
+            wherePreview._categories = categories;
+          }
+          if (region) wherePreview.region = region;
+
+          console.debug(`[UniversalSearch] searching model=${src.key} with where=`, JSON.stringify(wherePreview));
+
+          const rows = await safeModelSearch(src.model, whereDate, sortBy, sortOrder, q, categories, region);
+
+          console.info(`[UniversalSearch] model=${src.key} returned ${Array.isArray(rows) ? rows.length : 0} rows`);
+
+          // defensive: ensure rows is array
+          if (!Array.isArray(rows)) return [];
+
+          return rows.map(r => ({ ...r, contentType: src.contentType }));
+        } catch (err) {
+          console.error(`[UniversalSearch] error querying model=${src.key}:`, err && err.stack ? err.stack : err);
+          // não lançar para não quebrar a busca global; retornar array vazio para esse model
+          return [];
+        }
       })
     );
 
@@ -238,13 +266,26 @@ router.get('/search', async (req, res) => {
       searchTime: Date.now() - t0,
     };
 
+    if (wantDebug) {
+      // Retorna payload não codificado para facilitar debug (não usar em produção sem proteção)
+      console.warn('[UniversalSearch] debug payload requested (raw JSON response)');
+      return res.status(200).json({ debug: true, payload });
+    }
+
+    if (wantRaw) {
+      // Retorna sem ofuscação (útil para verificar se o DB está realmente retornando registros)
+      return res.status(200).json({ data: payload });
+    }
+
     const encodedPayload = encodePayloadToBase64(payload);
     return res.status(200).json({ data: encodedPayload });
   } catch (err) {
+    console.error('[UniversalSearch] fatal error:', err && err.stack ? err.stack : err);
+
     // Resposta de contingência também codificada
     const emergencyPayload = {
-      page,
-      perPage: limit,
+      page: Math.max(parseInt(req.query.page || '1', 10), 1),
+      perPage: Math.min(Math.max(parseInt(req.query.limit || '300', 10), 1), 500),
       total: 0,
       totalPages: 0,
       data: [],
