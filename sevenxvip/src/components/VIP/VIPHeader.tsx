@@ -334,6 +334,9 @@ const VIPHeader: React.FC = () => {
                 </motion.div>
               ))}
 
+              
+              
+
               {/* Account Section for Mobile */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}

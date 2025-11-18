@@ -151,7 +151,6 @@ const pool = new Pool({
   }
 });
 
-// 🧠 Teste de conexão ao banco
 const testConnection = async () => {
   try {
     const client = await pool.connect();

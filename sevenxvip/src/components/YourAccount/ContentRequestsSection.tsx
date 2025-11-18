@@ -52,7 +52,7 @@ const ContentRequestsSection: React.FC<Props> = ({ userData, onTicketsUpdate }) 
         {
           headers: {
             'Authorization': `Bearer ${token}`,
-            'x-api-key': import.meta.env.VITE_API_KEY
+            'x-api-key': import.meta.env.VITE_FRONTEND_API_KEY
           }
         }
       );
@@ -84,7 +84,7 @@ const ContentRequestsSection: React.FC<Props> = ({ userData, onTicketsUpdate }) 
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
-            'x-api-key': import.meta.env.VITE_API_KEY
+            'x-api-key': import.meta.env.VITE_FRONTEND_API_KEY
           },
           body: JSON.stringify(formData)
         }
