@@ -531,9 +531,9 @@ const Plans: React.FC = () => {
                 ))}
               </ul>
 
-              <button
+              <button 
                 onClick={() => handleAccessClick("titanium")}
-                className={`w-full py-3 rounded-xl font-bold text-base transition-all duration-300 ${
+                className={`w-full py-3 relative bottom-3 rounded-xl font-bold text-base transition-all duration-300 ${
                   isDark
                     ? 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black'
                     : 'bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white'

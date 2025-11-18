@@ -312,24 +312,7 @@ const asianContentDetails = () => {
                 <Tag className="w-4 h-4" />
                 <span className="font-medium text-sm break-words">{content.category}</span>
               </motion.div>
-{content.preview && (
-  <motion.div
-    initial={{ opacity: 0, x: 20 }}
-    animate={{ opacity: 1, x: 0 }}
-    transition={{ delay: 0.5 }}
-    className="relative"
-  >
-    <PreviewButton onClick={() => setShowPreview(true)} />
 
-    {showPreview && (
-      <PreviewModal
-        imageUrl={content.preview}
-        contentName={content.name}
-        onClose={() => setShowPreview(false)}
-      />
-    )}
-  </motion.div>
-)}
 
             </div>
           </div>
