@@ -4,6 +4,7 @@ const db = require('./models');
 require('dotenv').config();
 const { Pool } = require('pg');
 const { ensureConnection } = require('./utils/dbHealthCheck');
+const { setupQueryMonitoring } = require('./utils/queryMonitor');
 
 const app = express();
 
@@ -68,10 +69,6 @@ const VipBannedRouter = require('./routes/VipBannedContent');
 const VipUnknownRouter = require('./routes/VipUnknownContent');
 const universalSearchRouter = require('./routes/UniversalSearch');
 
-// Aplicar health check em rotas críticas
-app.use('/universal-search', ensureConnection);
-app.use('/asiancontent', ensureConnection);
-app.use('/westerncontent', ensureConnection);
 
 app.use('/auth', userRouter);
 app.use('/cancel-subscription', cancelsubscriptionRouter);
@@ -138,13 +135,12 @@ app.use((req, res, next) => {
 });
 
 const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL, 
-  max: 3,
-  min: 0,
-  idle: 5000,
-  connectionTimeoutMillis: 60000,
+  connectionString: process.env.POSTGRES_URL,
+  max: 20,
+  min: 5,
   idleTimeoutMillis: 30000,
-  allowExitOnIdle: true,
+  connectionTimeoutMillis: 10000,
+  allowExitOnIdle: false,
   ssl: {
     require: true,
     rejectUnauthorized: false
@@ -152,44 +148,46 @@ const pool = new Pool({
 });
 
 const testConnection = async () => {
-  try {
-    const client = await pool.connect();
-    console.log('✅ Conexão bem-sucedida ao banco de dados');
-    client.release();
-  } catch (err) {
-    console.error('❌ Erro ao conectar ao banco de dados:', err);
+  const maxRetries = 3;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const client = await pool.connect();
+      console.log('✅ Conexão bem-sucedida ao banco de dados');
+      client.release();
+      return true;
+    } catch (err) {
+      console.error(`❌ Tentativa ${i + 1}/${maxRetries} falhou:`, err.message);
+      if (i < maxRetries - 1) await new Promise(resolve => setTimeout(resolve, 2000));
+    }
   }
+  return false;
 };
 
 // ⚙️ Inicialização do Sequelize
 const initializeDatabase = async () => {
-  try {
-    await Promise.race([
-      db.sequelize.authenticate(),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout na autenticação')), 10000)
-      )
-    ]);
-    console.log('✅ Conexão Sequelize estabelecida com sucesso.');
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await db.sequelize.authenticate();
+      console.log('✅ Conexão Sequelize estabelecida com sucesso.');
 
-    const tablesCreated = await Promise.race([
-      db.createTablesIfNotExist(),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout na criação de tabelas')), 30000)
-      )
-    ]);
-    
-    if (tablesCreated) {
-      console.log('✅ Database initialization completed.');
-    } else {
-      console.warn('⚠️ Algumas tabelas podem não ter sido criadas corretamente.');
+      const tablesCreated = await db.createTablesIfNotExist();
+      if (tablesCreated) {
+        console.log('✅ Database initialization completed.');
+      }
+      return true;
+    } catch (error) {
+      console.error(`❌ Tentativa ${attempt}/${maxRetries} falhou:`, error.message);
+      if (attempt < maxRetries) {
+        console.log(`⏳ Aguardando 3s antes da próxima tentativa...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      } else {
+        console.log('⚠️ Continuando sem sync completo...');
+        return true;
+      }
     }
-    return true;
-  } catch (error) {
-    console.error('❌ Erro na inicialização do banco:', error.message);
-    console.log('⚠️ Continuando sem sync completo...');
-    return true;
   }
+  return false;
 };
 
 // 🚀 Inicialização assíncrona principal
@@ -197,6 +195,7 @@ const initializeDatabase = async () => {
   try {
     await testConnection();
     const dbInitialized = await initializeDatabase();
+    setupQueryMonitoring();
 
     if (dbInitialized) {
       const PORT = process.env.PORT || 3001;

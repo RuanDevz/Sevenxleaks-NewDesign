@@ -18,31 +18,24 @@ const url = process.env.POSTGRES_URL || (cfg.use_env_variable ? process.env[cfg.
 if (url) {
   sequelize = new Sequelize(url, {
     dialect: 'postgres',
-    logging: false, // Desabilita logs para reduzir overhead
+    logging: false,
     dialectOptions: {
       ssl: {
         require: true,
         rejectUnauthorized: false
       },
-      // Configurações agressivas de timeout
-      connectTimeout: 35000,
-      socketTimeout: 20000,
-      keepAlive: true,
-      keepAliveInitialDelayMillis: 0,
-      statement_timeout: 15000, // 15 segundos para statements
-      query_timeout: 15000,
-      idle_in_transaction_session_timeout: 10000
+      connectTimeout: 60000,
+      statement_timeout: 30000,
+      query_timeout: 30000,
+      idle_in_transaction_session_timeout: 20000
     },
     pool: {
-      max: 5, // Apenas 1 conexão para evitar concorrência
-      min: 0,
-      idle: 3000, // Reduzido drasticamente
-      acquire: 15000, // Reduzido para 15 segundos
-      evict: 1000,
-      handleDisconnects: true,
-      validate: (client) => {
-        return client && !client.connection._ending && !client.connection.destroyed;
-      }
+      max: 20,
+      min: 5,
+      idle: 30000,
+      acquire: 60000,
+      evict: 10000,
+      handleDisconnects: true
     },
     retry: {
       match: [
@@ -58,22 +51,12 @@ if (url) {
         /SequelizeConnectionTimedOutError/,
         /ConnectionAcquireTimeoutError/
       ],
-      max: 2 // Reduzido para 2 tentativas
+      max: 5
     },
-    // Configurações para reduzir overhead
     define: {
       freezeTableName: true,
       timestamps: true,
       underscored: false
-    },
-    // Configurações específicas para serverless
-    hooks: {
-      beforeConnect: async (config) => {
-        console.log('Tentando conectar ao banco...');
-      },
-      afterConnect: async (connection, config) => {
-        console.log('Conexão estabelecida com sucesso');
-      }
     }
   });
 } else {
@@ -84,11 +67,11 @@ if (url) {
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     dialectOptions: cfg.dialectOptions || {},
     pool: cfg.pool || {
-      max: 1,
-      min: 0,
-      idle: 3000,
-      acquire: 15000,
-      evict: 1000
+      max: 10,
+      min: 2,
+      idle: 30000,
+      acquire: 60000,
+      evict: 10000
     }
   });
 }
