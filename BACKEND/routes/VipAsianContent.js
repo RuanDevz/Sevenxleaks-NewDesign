@@ -47,15 +47,13 @@ router.get('/search', async (req, res) => {
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
 
-    const { search, category, month, sortBy = 'postDate', sortOrder = 'DESC' } = req.query;
+    const { search, category, month, region, sortBy = 'postDate', sortOrder = 'DESC' } = req.query;
 
     let allResults = [];
-    
-    // Busca universal em todas as tabelas VIP
+
     if (search) {
       const searchWhere = { name: { [Op.iLike]: `%${search}%` } };
-      
-      // Adiciona filtro de mês se especificado
+
       if (month) {
         searchWhere.postDate = {
           [Op.and]: [
@@ -66,61 +64,39 @@ router.get('/search', async (req, res) => {
           ]
         };
       }
-      
-      // Busca em VipAsianContent
-      const vipAsianResults = await VipAsianContent.findAll({
+      if (category) searchWhere.category = category;
+      if (region) searchWhere.region = region;
+
+      const commonOpts = {
         where: searchWhere,
         order: [[sortBy, sortOrder]],
         raw: true
-      });
-      
-      // Busca em VipWesternContent
-      const vipWesternResults = await VipWesternContent.findAll({
-        where: searchWhere,
-        order: [[sortBy, sortOrder]],
-        raw: true
-      });
-      
-      // Busca em VipBannedContent
-      const vipBannedResults = await VipBannedContent.findAll({
-        where: searchWhere,
-        order: [[sortBy, sortOrder]],
-        raw: true
-      });
-      
-      // Busca em VipUnknownContent
-      const vipUnknownResults = await VipUnknownContent.findAll({
-        where: searchWhere,
-        order: [[sortBy, sortOrder]],
-        raw: true
-      });
-      
-      // Adiciona tipo de conteúdo para identificação
-      const vipAsianWithType = vipAsianResults.map(item => ({ ...item, contentType: 'vip-asian' }));
-      const vipWesternWithType = vipWesternResults.map(item => ({ ...item, contentType: 'vip-western' }));
-      const vipBannedWithType = vipBannedResults.map(item => ({ ...item, contentType: 'vip-banned' }));
-      const vipUnknownWithType = vipUnknownResults.map(item => ({ ...item, contentType: 'vip-unknown' }));
-      
-      // Combina todos os resultados
+      };
+
+      const [vipAsianResults, vipWesternResults, vipBannedResults, vipUnknownResults] = await Promise.all([
+        VipAsianContent.findAll(commonOpts),
+        VipWesternContent.findAll(commonOpts),
+        VipBannedContent.findAll(commonOpts),
+        VipUnknownContent.findAll(commonOpts)
+      ]);
+
+      const withType = (rows, type) => rows.map(item => ({ ...item, contentType: type }));
       allResults = [
-        ...vipAsianWithType,
-        ...vipWesternWithType,
-        ...vipBannedWithType,
-        ...vipUnknownWithType
+        ...withType(vipAsianResults, 'vip-asian'),
+        ...withType(vipWesternResults, 'vip-western'),
+        ...withType(vipBannedResults, 'vip-banned'),
+        ...withType(vipUnknownResults, 'vip-unknown')
       ];
-      
-      // Ordena por data
+
       allResults.sort((a, b) => {
         const dateA = new Date(a.postDate);
         const dateB = new Date(b.postDate);
         return sortOrder === 'DESC' ? dateB.getTime() - dateA.getTime() : dateA.getTime() - dateB.getTime();
       });
     } else {
-      // Se não há busca, retorna apenas conteúdo VIP asiático
       const where = {};
-      if (category) {
-        where.category = category;
-      }
+      if (category) where.category = category;
+      if (region) where.region = region;
       if (month) {
         where.postDate = {
           [Op.and]: [
@@ -131,13 +107,13 @@ router.get('/search', async (req, res) => {
           ]
         };
       }
-      
+
       const results = await VipAsianContent.findAll({
         where,
         order: [[sortBy, sortOrder]],
         raw: true
       });
-      
+
       allResults = results.map(item => ({ ...item, contentType: 'vip-asian' }));
     }
     
@@ -165,19 +141,28 @@ router.get('/search', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = 900;
+    const limit = parseInt(req.query.limit) || 300;
     const offset = (page - 1) * limit;
+    const { region } = req.query;
+
+    const where = {};
+    if (region) where.region = region;
 
     const vipAsianContents = await VipAsianContent.findAll({
+      where,
       limit,
       offset,
       order: [['postDate', 'DESC']],
+      raw: true
     });
 
+    const totalCount = await VipAsianContent.count({ where });
     const payload = {
       page,
       perPage: limit,
-      data: vipAsianContents,
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      data: vipAsianContents
     };
 
     const encodedPayload = encodePayloadToBase64(payload);

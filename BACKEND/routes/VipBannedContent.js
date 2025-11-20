@@ -55,7 +55,6 @@ router.get('/search', async (req, res) => {
     if (search) {
       const searchWhere = { name: { [Op.iLike]: `%${search}%` } };
       
-      // Adiciona filtro de mês se especificado
       if (month) {
         searchWhere.postDate = {
           [Op.and]: [
@@ -66,40 +65,27 @@ router.get('/search', async (req, res) => {
           ]
         };
       }
-      
-      // Busca em VipAsianContent
-      const vipAsianResults = await VipAsianContent.findAll({
+      if (category) searchWhere.category = category;
+      if (region) searchWhere.region = region;
+
+      const commonOpts = {
         where: searchWhere,
         order: [[sortBy, sortOrder]],
         raw: true
-      });
-      
-      // Busca em VipWesternContent
-      const vipWesternResults = await VipWesternContent.findAll({
-        where: searchWhere,
-        order: [[sortBy, sortOrder]],
-        raw: true
-      });
-      
-      // Busca em VipBannedContent
-      const vipBannedResults = await VipBannedContent.findAll({
-        where: searchWhere,
-        order: [[sortBy, sortOrder]],
-        raw: true
-      });
-      
-      // Busca em VipUnknownContent
-      const vipUnknownResults = await VipUnknownContent.findAll({
-        where: searchWhere,
-        order: [[sortBy, sortOrder]],
-        raw: true
-      });
-      
-      // Adiciona tipo de conteúdo para identificação
-      const vipAsianWithType = vipAsianResults.map(item => ({ ...item, contentType: 'vip-asian' }));
-      const vipWesternWithType = vipWesternResults.map(item => ({ ...item, contentType: 'vip-western' }));
-      const vipBannedWithType = vipBannedResults.map(item => ({ ...item, contentType: 'vip-banned' }));
-      const vipUnknownWithType = vipUnknownResults.map(item => ({ ...item, contentType: 'vip-unknown' }));
+      };
+
+      const [vipAsianResults, vipWesternResults, vipBannedResults, vipUnknownResults] = await Promise.all([
+        VipAsianContent.findAll(commonOpts),
+        VipWesternContent.findAll(commonOpts),
+        VipBannedContent.findAll(commonOpts),
+        VipUnknownContent.findAll(commonOpts)
+      ]);
+
+      const withType = (rows, type) => rows.map(item => ({ ...item, contentType: type }));
+      const vipAsianWithType = withType(vipAsianResults, 'vip-asian');
+      const vipWesternWithType = withType(vipWesternResults, 'vip-western');
+      const vipBannedWithType = withType(vipBannedResults, 'vip-banned');
+      const vipUnknownWithType = withType(vipUnknownResults, 'vip-unknown');
       
       // Combina todos os resultados
       allResults = [
@@ -168,26 +154,28 @@ router.get('/search', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = 900;
+    const limit = parseInt(req.query.limit) || 300;
     const offset = (page - 1) * limit;
     const { region } = req.query;
 
     const where = {};
-    if (region) {
-      where.region = region;
-    }
+    if (region) where.region = region;
 
     const vipBannedContents = await VipBannedContent.findAll({
       where,
       limit,
       offset,
       order: [['postDate', 'DESC']],
+      raw: true
     });
 
+    const totalCount = await VipBannedContent.count({ where });
     const payload = {
       page,
       perPage: limit,
-      data: vipBannedContents,
+      total: totalCount,
+      totalPages: Math.ceil(totalCount / limit),
+      data: vipBannedContents
     };
 
     const encodedPayload = encodePayloadToBase64(payload);

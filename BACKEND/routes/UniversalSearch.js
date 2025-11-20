@@ -126,13 +126,6 @@ async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categor
     where.category = { [Op.in]: categories };
   }
 
-  if (region) {
-    where.region = region;
-  }
-
-  // Para debugging local: log dos filtros
-  // console.debug('safeModelSearch where:', JSON.stringify(where));
-
   return model.findAll({
     where,
     order: [
@@ -141,6 +134,9 @@ async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categor
       ['id', sortOrder],
     ],
     raw: true,
+  }).catch(err => {
+    console.error(`[safeModelSearch] Query error for model ${model.name}:`, err.message);
+    return [];
   });
 }
 
@@ -178,7 +174,7 @@ router.get('/search', async (req, res) => {
     ? String(req.query.categories).split(',').map(s => s.trim()).filter(Boolean)
     : (req.query.category ? [String(req.query.category).trim()] : undefined);
 
-  const dateFilter = req.query.dateFilter; // today, yesterday, last7, last30, thisMonth, prevMonth, 7days, all
+  const dateFilter = req.query.dateFilter;
   const month = req.query.month ? parseInt(req.query.month, 10) : undefined;
   const region = req.query.region ? String(req.query.region).trim() : undefined;
 
@@ -190,6 +186,25 @@ router.get('/search', async (req, res) => {
   const wantDebug = String(req.query.debug || '0') === '1';
 
   try {
+    const { sequelize } = require('../models');
+
+    try {
+      await sequelize.authenticate();
+    } catch (dbErr) {
+      console.error('[UniversalSearch] Database connection failed:', dbErr.message);
+      const emergencyPayload = {
+        page,
+        perPage: limit,
+        total: 0,
+        totalPages: 0,
+        data: [],
+        error: 'DB_CONNECTION_FAILED',
+        message: 'Database temporarily unavailable',
+        searchTime: Date.now() - t0,
+      };
+      const encodedPayload = encodePayloadToBase64(emergencyPayload);
+      return res.status(200).json({ data: encodedPayload });
+    }
     const whereDate = createDateFilter(dateFilter, month);
 
     // Define fontes a consultar
@@ -198,23 +213,13 @@ router.get('/search', async (req, res) => {
       return src.key === contentType || src.contentType === contentType;
     });
 
-    console.info(`[UniversalSearch] selectedSources: ${selectedSources.map(s => s.key).join(', ') || '(none)'} | q:${q || '-'} | categories:${categories ? categories.join(',') : '-'} | region:${region || '-'}`);
+    console.info(`[UniversalSearch] selectedSources: ${selectedSources.map(s => s.key).join(', ') || '(none)'} | q:${q || '-'} | categories:${categories ? categories.join(',') : '-'}`);
 
     // Execução concorrente sem paginação por modelo
     const parts = await Promise.all(
       selectedSources.map(async (src) => {
         try {
-          // log do where usado para esse model (útil para entender porque não retorna nada)
-          const wherePreview = { ...whereDate };
-          if (q) {
-            wherePreview._q = q;
-          }
-          if (categories && categories.length) {
-            wherePreview._categories = categories;
-          }
-          if (region) wherePreview.region = region;
-
-          console.debug(`[UniversalSearch] searching model=${src.key} with where=`, JSON.stringify(wherePreview));
+          console.debug(`[UniversalSearch] searching model=${src.key}`);
 
           const rows = await safeModelSearch(src.model, whereDate, sortBy, sortOrder, q, categories, region);
 
@@ -225,8 +230,7 @@ router.get('/search', async (req, res) => {
 
           return rows.map(r => ({ ...r, contentType: src.contentType }));
         } catch (err) {
-          console.error(`[UniversalSearch] error querying model=${src.key}:`, err && err.stack ? err.stack : err);
-          // não lançar para não quebrar a busca global; retornar array vazio para esse model
+          console.error(`[UniversalSearch] error querying model=${src.key}:`, err.message);
           return [];
         }
       })

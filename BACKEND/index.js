@@ -136,9 +136,9 @@ app.use((req, res, next) => {
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,
-  max: 20,
-  min: 5,
-  idleTimeoutMillis: 30000,
+  max: 5,
+  min: 0,
+  idleTimeoutMillis: 2000,
   connectionTimeoutMillis: 10000,
   allowExitOnIdle: false,
   ssl: {
