@@ -1,3 +1,4 @@
+// /routes/UniversalSearch.js
 const express = require('express');
 const router = express.Router();
 const { Op, Sequelize } = require('sequelize');
@@ -13,6 +14,9 @@ const {
   VipUnknownContent,
 } = require('../models');
 
+/** =========================
+ *  Utilidades de codificação
+ *  ========================= */
 function insertRandomChar(base64Str) {
   const letters = 'abcdefghijklmnopqrstuvwxyz';
   const randomChar = letters.charAt(Math.floor(Math.random() * letters.length));
@@ -25,6 +29,9 @@ function encodePayloadToBase64(payload) {
   return insertRandomChar(base64Str);
 }
 
+/** ==========================================
+ *  Filtro de datas baseado em postDate (robusto)
+ *  ========================================== */
 function createDateFilter(dateFilter, month) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -55,7 +62,7 @@ function createDateFilter(dateFilter, month) {
   const where = {};
   const start = new Date(today);
   const end = new Date(today);
-  end.setDate(end.getDate() + 1);
+  end.setDate(end.getDate() + 1); // exclusivo
 
   switch (df) {
     case 'today':
@@ -93,13 +100,17 @@ function createDateFilter(dateFilter, month) {
       break;
     }
     default:
+      // sem filtro de data
       break;
   }
 
   return where;
 }
 
-async function optimizedModelSearch(model, whereClause, sortBy, sortOrder, q, categories, limit, offset) {
+/** ===================================
+ *  Busca por modelo SEM paginação aqui
+ *  =================================== */
+async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categories, region) {
   const where = { ...whereClause };
 
   if (q) {
@@ -115,54 +126,25 @@ async function optimizedModelSearch(model, whereClause, sortBy, sortOrder, q, ca
     where.category = { [Op.in]: categories };
   }
 
-  try {
-    const [rows, count] = await Promise.all([
-      model.findAll({
-        where,
-        order: [
-          [Sequelize.col(sortBy), sortOrder],
-          ['createdAt', sortOrder],
-          ['id', sortOrder],
-        ],
-        limit,
-        offset,
-        raw: true,
-        logging: false,
-      }),
-      model.count({ where, logging: false })
-    ]);
-
-    return { rows, count };
-  } catch (err) {
-    console.error(`[optimizedModelSearch] Error for ${model.name}:`, err.message);
-    return { rows: [], count: 0 };
-  }
+  return model.findAll({
+  where,
+  order: [
+    [Sequelize.col(sortBy), sortOrder],
+    ['createdAt', sortOrder],
+    ['id', sortOrder],
+  ],
+  attributes: ['id', 'name', 'slug', 'category', 'postDate', 'createdAt'], // já evita carregar colunas pesadas
+  limit: 2000, // impede tabelas gigantes de travarem o Supabase
+  raw: true,
+  }).catch(err => {
+    console.error(`[safeModelSearch] Query error for model ${model.name}:`, err.message);
+    return [];
+  });
 }
 
-async function getApproximateCount(model, whereClause, q, categories) {
-  const where = { ...whereClause };
-
-  if (q) {
-    const like = { [Op.iLike]: `%${q}%` };
-    where[Op.or] = [
-      { name: like },
-      { slug: like },
-      { category: like },
-    ];
-  }
-
-  if (categories && categories.length) {
-    where.category = { [Op.in]: categories };
-  }
-
-  try {
-    return await model.count({ where, logging: false });
-  } catch (err) {
-    console.error(`[getApproximateCount] Error for ${model.name}:`, err.message);
-    return 0;
-  }
-}
-
+/** ============================
+ *  Mapa de fontes / contentType
+ *  ============================ */
 const SOURCES = [
   { key: 'asian',       model: AsianContent,      contentType: 'asian' },
   { key: 'western',     model: WesternContent,    contentType: 'western' },
@@ -174,16 +156,22 @@ const SOURCES = [
   { key: 'vip-unknown', model: VipUnknownContent, contentType: 'vip-unknown' },
 ];
 
+/** ===========================
+ *  Rota GET /universal-search
+ *  =========================== */
 router.get('/search', async (req, res) => {
   const t0 = Date.now();
 
+  // Query params com defaults seguros
   const page = Math.max(parseInt(req.query.page || '1', 10), 1);
   const limit = Math.min(Math.max(parseInt(req.query.limit || '300', 10), 1), 500);
   const sortBy = (req.query.sortBy || 'postDate');
   const sortOrder = (String(req.query.sortOrder || 'DESC').toUpperCase() === 'ASC') ? 'ASC' : 'DESC';
 
+  // Compatibilidade: aceita tanto 'q' quanto 'search'
   const q = (req.query.q ?? req.query.search)?.toString().trim() || undefined;
 
+  // Categoria única ou CSV
   const categories = req.query.categories
     ? String(req.query.categories).split(',').map(s => s.trim()).filter(Boolean)
     : (req.query.category ? [String(req.query.category).trim()] : undefined);
@@ -192,8 +180,10 @@ router.get('/search', async (req, res) => {
   const month = req.query.month ? parseInt(req.query.month, 10) : undefined;
   const region = req.query.region ? String(req.query.region).trim() : undefined;
 
+  // Filtro de fonte
   const contentType = (req.query.contentType || 'all').toString();
 
+  // DEBUG helpers
   const wantRaw = String(req.query.raw || '0') === '1';
   const wantDebug = String(req.query.debug || '0') === '1';
 
@@ -217,47 +207,41 @@ router.get('/search', async (req, res) => {
       const encodedPayload = encodePayloadToBase64(emergencyPayload);
       return res.status(200).json({ data: encodedPayload });
     }
-
     const whereDate = createDateFilter(dateFilter, month);
 
+    // Define fontes a consultar
     const selectedSources = SOURCES.filter(src => {
       if (contentType === 'all') return true;
       return src.key === contentType || src.contentType === contentType;
     });
 
-    console.info(`[UniversalSearch] selectedSources: ${selectedSources.map(s => s.key).join(', ')}`);
+    console.info(`[UniversalSearch] selectedSources: ${selectedSources.map(s => s.key).join(', ') || '(none)'} | q:${q || '-'} | categories:${categories ? categories.join(',') : '-'}`);
 
-    const offset = (page - 1) * limit;
-    const perSourceLimit = Math.ceil(limit / selectedSources.length) + 10;
-
-    const results = await Promise.all(
+    // Execução concorrente sem paginação por modelo
+    const parts = await Promise.all(
       selectedSources.map(async (src) => {
         try {
-          const { rows, count } = await optimizedModelSearch(
-            src.model,
-            whereDate,
-            sortBy,
-            sortOrder,
-            q,
-            categories,
-            perSourceLimit,
-            0
-          );
+          console.debug(`[UniversalSearch] searching model=${src.key}`);
 
-          return {
-            rows: rows.map(r => ({ ...r, contentType: src.contentType })),
-            count,
-            source: src.key
-          };
+          const rows = await safeModelSearch(src.model, whereDate, sortBy, sortOrder, q, categories, region);
+
+          console.info(`[UniversalSearch] model=${src.key} returned ${Array.isArray(rows) ? rows.length : 0} rows`);
+
+          // defensive: ensure rows is array
+          if (!Array.isArray(rows)) return [];
+
+          return rows.map(r => ({ ...r, contentType: src.contentType }));
         } catch (err) {
-          console.error(`[UniversalSearch] Error querying ${src.key}:`, err.message);
-          return { rows: [], count: 0, source: src.key };
+          console.error(`[UniversalSearch] error querying model=${src.key}:`, err.message);
+          return [];
         }
       })
     );
 
-    let allResults = results.flatMap(r => r.rows);
+    // Merge
+    let allResults = parts.flat();
 
+    // Ordenação estável global
     allResults.sort((a, b) => {
       const ap = new Date(a.postDate || a.createdAt).getTime();
       const bp = new Date(b.postDate || b.createdAt).getTime();
@@ -272,35 +256,42 @@ router.get('/search', async (req, res) => {
       return sortOrder === 'DESC' ? (bi - ai) : (ai - bi);
     });
 
-    const approximateTotal = results.reduce((sum, r) => sum + r.count, 0);
+    // Paginação única
+    const total = allResults.length;
+    const totalPages = Math.max(Math.ceil(total / limit), 1);
+    const offset = (page - 1) * limit;
     const data = allResults.slice(offset, offset + limit);
 
+    // Payload + codificação
     const payload = {
       page,
       perPage: limit,
-      total: approximateTotal,
-      totalPages: Math.max(Math.ceil(approximateTotal / limit), 1),
+      total,
+      totalPages,
       data,
       searchTime: Date.now() - t0,
-      sources: results.map(r => ({ source: r.source, count: r.count }))
     };
 
     if (wantDebug) {
+      // Retorna payload não codificado para facilitar debug (não usar em produção sem proteção)
+      console.warn('[UniversalSearch] debug payload requested (raw JSON response)');
       return res.status(200).json({ debug: true, payload });
     }
 
     if (wantRaw) {
+      // Retorna sem ofuscação (útil para verificar se o DB está realmente retornando registros)
       return res.status(200).json({ data: payload });
     }
 
     const encodedPayload = encodePayloadToBase64(payload);
     return res.status(200).json({ data: encodedPayload });
   } catch (err) {
-    console.error('[UniversalSearch] Fatal error:', err?.stack || err);
+    console.error('[UniversalSearch] fatal error:', err && err.stack ? err.stack : err);
 
+    // Resposta de contingência também codificada
     const emergencyPayload = {
-      page,
-      perPage: limit,
+      page: Math.max(parseInt(req.query.page || '1', 10), 1),
+      perPage: Math.min(Math.max(parseInt(req.query.limit || '300', 10), 1), 500),
       total: 0,
       totalPages: 0,
       data: [],

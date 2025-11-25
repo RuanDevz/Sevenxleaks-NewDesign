@@ -24,10 +24,6 @@ if (url) {
         require: true,
         rejectUnauthorized: false
       },
-      connectTimeout: 60000,
-      statement_timeout: 30000,
-      query_timeout: 30000,
-      idle_in_transaction_session_timeout: 20000
     },
     pool: {
       max: 20,
