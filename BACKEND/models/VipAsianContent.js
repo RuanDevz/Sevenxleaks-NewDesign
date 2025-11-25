@@ -52,10 +52,10 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
     },
 
-      preview: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
+    //   preview: {
+    //   type: DataTypes.STRING,
+    //   allowNull: true,
+    // },
     postDate: {
       type: DataTypes.DATE,
       allowNull: false,
