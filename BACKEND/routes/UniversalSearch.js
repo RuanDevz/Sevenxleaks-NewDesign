@@ -126,21 +126,34 @@ async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categor
     where.category = { [Op.in]: categories };
   }
 
+  // Colunas diferentes para VIP e não VIP
+  const normalAttributes = ['id', 'name', 'slug', 'category', 'preview', 'postDate', 'createdAt'];
+  const vipAttributes = ['id', 'name', 'slug', 'category', 'postDate', 'createdAt'];
+
+  const attributes = ['Vip' + model.name] // modelo VIP
+    ? vipAttributes
+    : normalAttributes;
+
+  // Melhor forma: checar se é VIP pelo nome do modelo
+  const isVIP = ['VipAsianContent', 'VipWesternContent', 'VipBannedContent', 'VipUnknownContent'].includes(model.name);
+  const cols = isVIP ? vipAttributes : normalAttributes;
+
   return model.findAll({
-  where,
-  order: [
-    [Sequelize.col(sortBy), sortOrder],
-    ['createdAt', sortOrder],
-    ['id', sortOrder],
-  ],
-  attributes: ['id', 'name', 'slug', 'category', 'postDate', 'preview', 'createdAt'], // já evita carregar colunas pesadas
-  limit: 2000, // impede tabelas gigantes de travarem o Supabase
-  raw: true,
+    where,
+    order: [
+      [Sequelize.col(sortBy), sortOrder],
+      ['createdAt', sortOrder],
+      ['id', sortOrder],
+    ],
+    attributes: cols,
+    limit: 2000,
+    raw: true,
   }).catch(err => {
     console.error(`[safeModelSearch] Query error for model ${model.name}:`, err.message);
     return [];
   });
 }
+
 
 /** ============================
  *  Mapa de fontes / contentType
