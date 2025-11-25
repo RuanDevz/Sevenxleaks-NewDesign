@@ -139,7 +139,7 @@ router.post(
               stripeCustomerId: session.customer || user.stripeCustomerId || null,
               vipTier: 'lifetime',
               subscriptionType: 'lifetime',
-              requestTickets: 10,
+              requestTickets: 2,
               requestTicketsResetDate: resetDate,
             });
 
