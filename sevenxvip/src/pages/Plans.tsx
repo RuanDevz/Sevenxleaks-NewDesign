@@ -163,7 +163,7 @@ const Plans: React.FC = () => {
         { icon: Flame, text: "LIFETIME ACCESS - Forever!", highlight: true },
         { icon: Check, text: "Everything in DIAMOND" },
         { icon: Crown, text: "Exclusive LIFETIME badge", highlight: true },
-        { icon: Zap, text: "2 Request tickets (10/month)", highlight: true },
+        { icon: Zap, text: "5 Request tickets (10/month)", highlight: true },
         { icon: Star, text: "Never pay again!", highlight: true },
         { icon: Check, text: "All future features included" },
         { icon: Check, text: "VIP priority support 24/7" },
@@ -439,12 +439,12 @@ const Plans: React.FC = () => {
                   >
                     <feature.icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
                       feature.highlight
-                        ? 'text-black'
+                        ? isDark ? 'text-white' : 'text-black'
                         : isDark ? 'text-gray-500' : 'text-gray-600'
                     }`} />
                     <span className={`text-sm ${
                       feature.highlight
-                        ? 'font-bold text-black'
+                        ? isDark ? 'font-bold text-white' : 'font-bold text-black'
                         : isDark ? 'text-gray-300' : 'text-gray-700'
                     }`}>
                       {feature.text}
