@@ -293,7 +293,7 @@ const Plans: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
-              className={`relative rounded-2xl p-6 border-2 backdrop-blur-xl ${
+              className={`relative rounded-2xl p-6 border-2 backdrop-blur-xl flex flex-col ${
                 isDark
                   ? 'bg-gray-800/60 border-gray-600/30 hover:border-gray-500/50'
                   : 'bg-white/80 border-gray-400/40 hover:border-gray-500/60'
@@ -328,7 +328,7 @@ const Plans: React.FC = () => {
                 </div>
               </div>
 
-              <ul className="space-y-3 mb-6">
+              <ul className="space-y-3 mb-6 flex-grow">
                 {plans.free.features.map((feature, index) => (
                   <motion.li
                     key={index}
@@ -372,7 +372,7 @@ const Plans: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3, delay: 0.05 }}
-              className={`relative rounded-2xl p-6 border-4 backdrop-blur-xl ${
+              className={`relative rounded-2xl p-6 border-4 backdrop-blur-xl flex flex-col ${
                 isDark
                   ? 'bg-gradient-to-br from-gray-800/80 via-red-900/20 to-gray-800/80 border-red-500/70 hover:border-red-400/90'
                   : 'bg-gradient-to-br from-white/90 via-red-50/50 to-white/90 border-red-500/80 hover:border-red-600/100'
@@ -428,7 +428,7 @@ const Plans: React.FC = () => {
                 </p>
               </div>
 
-              <ul className="space-y-3 mb-6 relative">
+              <ul className="space-y-3 mb-6 relative flex-grow">
                 {plans.vitality.features.map((feature, index) => (
                   <motion.li
                     key={index}
@@ -473,7 +473,7 @@ const Plans: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3, delay: 0.1 }}
-              className={`relative rounded-2xl p-6 border-2 backdrop-blur-xl ${
+              className={`relative rounded-2xl p-6 border-2 backdrop-blur-xl flex flex-col ${
                 isDark
                   ? 'bg-gray-800/60 border-blue-500/30 hover:border-blue-400/50'
                   : 'bg-white/80 border-blue-400/40 hover:border-blue-500/60'
@@ -513,7 +513,7 @@ const Plans: React.FC = () => {
                 )}
               </div>
 
-              <ul className="space-y-3 mb-6">
+              <ul className="space-y-3 mb-6 flex-grow">
                 {plans.diamond.features.map((feature, index) => (
                   <motion.li
                     key={index}

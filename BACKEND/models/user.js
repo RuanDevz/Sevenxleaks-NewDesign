@@ -64,7 +64,7 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: null,
       },
       subscriptionType: {
-        type: DataTypes.ENUM('monthly', 'annual', 'vitality'),
+        type: DataTypes.ENUM('monthly', 'annual', 'lifetime'),
         allowNull: true,
         defaultValue: null,
       },
