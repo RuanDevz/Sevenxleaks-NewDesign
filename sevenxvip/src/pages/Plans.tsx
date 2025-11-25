@@ -151,18 +151,18 @@ const Plans: React.FC = () => {
       ]
     },
     vitality: {
-      name: "BLACK FRIDAY VITALITY",
+      name: "BLACK FRIDAY LIFETIME",
       icon: Flame,
-      color: "red",
+      color: "black",
       gradient: isDark
-        ? "from-red-600 via-orange-600 to-red-600"
-        : "from-red-700 via-orange-700 to-red-700",
+        ? "from-gray-900 via-black to-gray-900"
+        : "from-black via-gray-900 to-black",
       price: 199,
       originalPrice: 499,
       features: [
         { icon: Flame, text: "LIFETIME ACCESS - Forever!", highlight: true },
         { icon: Check, text: "Everything in DIAMOND" },
-        { icon: Crown, text: "Exclusive VITALITY badge", highlight: true },
+        { icon: Crown, text: "Exclusive LIFETIME badge", highlight: true },
         { icon: Zap, text: "5 Request tickets (10/month)", highlight: true },
         { icon: Star, text: "Never pay again!", highlight: true },
         { icon: Check, text: "All future features included" },
@@ -374,21 +374,21 @@ const Plans: React.FC = () => {
               transition={{ duration: 0.3, delay: 0.05 }}
               className={`relative rounded-2xl p-6 border-4 backdrop-blur-xl flex flex-col ${
                 isDark
-                  ? 'bg-gradient-to-br from-gray-800/80 via-red-900/20 to-gray-800/80 border-red-500/70 hover:border-red-400/90'
-                  : 'bg-gradient-to-br from-white/90 via-red-50/50 to-white/90 border-red-500/80 hover:border-red-600/100'
-              } shadow-2xl hover:shadow-red-500/40 transition-all duration-300`}
+                  ? 'bg-gradient-to-br from-gray-800/80 via-black to-gray-800/80 border-gray-900/70 hover:border-black/90'
+                  : 'bg-gradient-to-br from-white/90 via-gray-50/50 to-white/90 border-black/80 hover:border-black/100'
+              } shadow-2xl hover:shadow-black/40 transition-all duration-300`}
             >
-              {/* Fire animation background */}
+              {/* Black animation background */}
               <div className="absolute inset-0 rounded-2xl overflow-hidden opacity-20">
-                <div className="absolute top-0 left-1/4 w-32 h-32 bg-red-500 rounded-full blur-3xl animate-pulse"></div>
-                <div className="absolute bottom-0 right-1/4 w-32 h-32 bg-orange-500 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+                <div className="absolute top-0 left-1/4 w-32 h-32 bg-black rounded-full blur-3xl animate-pulse"></div>
+                <div className="absolute bottom-0 right-1/4 w-32 h-32 bg-gray-900 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
               </div>
 
               <div className={`absolute -top-3 left-1/2 transform -translate-x-1/2 px-4 py-1 rounded-full font-black text-xs ${
                 isDark
-                  ? 'bg-gradient-to-r from-red-600 via-orange-600 to-red-600 text-white'
-                  : 'bg-gradient-to-r from-red-700 via-orange-700 to-red-700 text-white'
-              } shadow-2xl border-2 border-yellow-400 animate-bounce`}>
+                  ? 'bg-gradient-to-r from-gray-900 via-black to-gray-900 text-white'
+                  : 'bg-gradient-to-r from-black via-gray-900 to-black text-white'
+              } shadow-2xl border-2 border-gray-400 animate-bounce`}>
                 🔥 LIMITED TIME
               </div>
 
@@ -399,12 +399,12 @@ const Plans: React.FC = () => {
                 <div>
                   <h3 className={`text-xl font-bold font-orbitron ${
                     isDark
-                      ? 'text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400'
-                      : 'text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-orange-600 to-yellow-600'
+                      ? 'text-transparent bg-clip-text bg-gradient-to-r from-gray-300 via-gray-400 to-gray-500'
+                      : 'text-transparent bg-clip-text bg-gradient-to-r from-gray-900 via-black to-gray-900'
                   }`}>
-                    VITALITY
+                    LIFETIME
                   </h3>
-                  <p className={`text-xs font-bold ${isDark ? 'text-red-400' : 'text-red-600'}`}>
+                  <p className={`text-xs font-bold ${isDark ? 'text-gray-400' : 'text-gray-900'}`}>
                     Lifetime Access
                   </p>
                 </div>
@@ -417,8 +417,8 @@ const Plans: React.FC = () => {
                   </span>
                   <span className={`text-4xl font-black font-orbitron ${
                     isDark
-                      ? 'text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400'
-                      : 'text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-600'
+                      ? 'text-transparent bg-clip-text bg-gradient-to-r from-gray-300 to-gray-500'
+                      : 'text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-black'
                   }`}>
                     ${plans.vitality.price}
                   </span>
@@ -439,12 +439,12 @@ const Plans: React.FC = () => {
                   >
                     <feature.icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
                       feature.highlight
-                        ? 'text-red-500'
-                        : isDark ? 'text-orange-400' : 'text-orange-600'
+                        ? 'text-black'
+                        : isDark ? 'text-gray-500' : 'text-gray-600'
                     }`} />
                     <span className={`text-sm ${
                       feature.highlight
-                        ? 'font-bold text-red-500'
+                        ? 'font-bold text-black'
                         : isDark ? 'text-gray-300' : 'text-gray-700'
                     }`}>
                       {feature.text}
@@ -457,9 +457,9 @@ const Plans: React.FC = () => {
                 onClick={() => handleAccessClick("vitality")}
                 className={`relative w-full py-3 rounded-xl font-bold text-base transition-all duration-300 overflow-hidden group ${
                   isDark
-                    ? 'bg-gradient-to-r from-red-600 via-orange-600 to-red-600 hover:from-red-500 hover:via-orange-500 hover:to-red-500 text-white'
-                    : 'bg-gradient-to-r from-red-700 via-orange-700 to-red-700 hover:from-red-600 hover:via-orange-600 hover:to-red-600 text-white'
-                } shadow-2xl hover:shadow-red-500/50 hover:scale-105 border-2 border-yellow-400`}
+                    ? 'bg-gradient-to-r from-gray-900 via-black to-gray-900 hover:from-black hover:via-gray-900 hover:to-black text-white'
+                    : 'bg-gradient-to-r from-black via-gray-900 to-black hover:from-gray-900 hover:via-black hover:to-gray-900 text-white'
+                } shadow-2xl hover:shadow-black/50 hover:scale-105 border-2 border-gray-400`}
               >
                 <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 group-hover:animate-shine"></span>
                 <span className="relative">🔥 Claim Lifetime Access</span>
@@ -630,7 +630,7 @@ const Plans: React.FC = () => {
                 ))}
               </ul>
 
-              <button 
+              <button
                 onClick={() => handleAccessClick("titanium")}
                 className={`w-full py-3 relative bottom-3 rounded-xl font-bold text-base transition-all duration-300 ${
                   isDark
