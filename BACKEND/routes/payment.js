@@ -34,7 +34,7 @@ router.post('/vip-payment', async (req, res) => {
 
         if (vipTier === 'lifetime') {
             // lifetime: Pagamento único (lifetime)
-            const priceId = process.env.STRIPE_PRICEID_lifetime;
+            const priceId = process.env.STRIPE_PRICEID_LIFETIME;
 
             if (!priceId) {
                 return res.status(500).json({ error: 'Price ID do lifetime não configurado.' });
