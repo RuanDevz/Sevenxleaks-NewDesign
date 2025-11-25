@@ -52,7 +52,7 @@ const Plans: React.FC = () => {
     checkAuthAndVipStatus();
   }, [token, email]);
 
-  const handleAccessClick = async (vipTier: "diamond" | "titanium" | "vitality") => {
+  const handleAccessClick = async (vipTier: "diamond" | "titanium" | "lifetime") => {
     const token = localStorage.getItem("Token");
     const email = localStorage.getItem("email");
 
@@ -367,7 +367,7 @@ const Plans: React.FC = () => {
 
             {/* Vitality Plan */}
             <motion.div
-              key="vitality"
+              key="lifetime"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
@@ -454,7 +454,7 @@ const Plans: React.FC = () => {
               </ul>
 
               <button
-                onClick={() => handleAccessClick("vitality")}
+                onClick={() => handleAccessClick("lifetime")}
                 className={`relative w-full py-3 rounded-xl font-bold text-base transition-all duration-300 overflow-hidden group ${
                   isDark
                     ? 'bg-gradient-to-r from-gray-900 via-black to-gray-900 hover:from-black hover:via-gray-900 hover:to-black text-white'
