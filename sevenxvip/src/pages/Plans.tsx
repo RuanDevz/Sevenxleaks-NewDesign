@@ -450,7 +450,7 @@ const Plans: React.FC = () => {
               </button>
             </motion.div>
 
-            {/* Titanium Plan */}
+            {/* Titanium Plan 
             <motion.div
               key={`titanium-${billingCycle}`}
               initial={{ opacity: 0, y: 20 }}
@@ -463,7 +463,6 @@ const Plans: React.FC = () => {
                   : 'bg-white/80 border-yellow-400/60 hover:border-yellow-500/80'
               } shadow-xl hover:shadow-yellow-500/30 transition-all duration-300`}
             >
-              {/* Popular Badge */}
               <div className={`absolute -top-3 left-1/2 transform -translate-x-1/2 px-4 py-1 rounded-full font-bold text-xs ${
                 isDark
                   ? 'bg-gradient-to-r from-yellow-500 to-orange-500 text-black'
@@ -542,6 +541,7 @@ const Plans: React.FC = () => {
                 Get Titanium Access
               </button>
             </motion.div>
+            */}
           </AnimatePresence>
         </div>
       </div>
