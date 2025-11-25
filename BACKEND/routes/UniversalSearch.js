@@ -133,7 +133,7 @@ async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categor
     ['createdAt', sortOrder],
     ['id', sortOrder],
   ],
-  attributes: ['id', 'name', 'slug', 'category', 'postDate', 'createdAt'], // já evita carregar colunas pesadas
+  attributes: ['id', 'name', 'slug', 'category', 'postDate', 'preview', 'createdAt'], // já evita carregar colunas pesadas
   limit: 2000, // impede tabelas gigantes de travarem o Supabase
   raw: true,
   }).catch(err => {
