@@ -127,15 +127,6 @@ async function optimizedModelSearch(model, whereClause, sortBy, sortOrder, q, ca
         limit,
         offset,
         raw: true,
-        attributes: [
-          'id',
-          'name',
-          'slug',
-          'category',
-          'postDate',
-          'createdAt',
-          'updatedAt',
-        ],
         logging: false,
       }),
       model.count({ where, logging: false })
@@ -187,7 +178,7 @@ router.get('/search', async (req, res) => {
   const t0 = Date.now();
 
   const page = Math.max(parseInt(req.query.page || '1', 10), 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit || '50', 10), 1), 100);
+  const limit = Math.min(Math.max(parseInt(req.query.limit || '300', 10), 1), 500);
   const sortBy = (req.query.sortBy || 'postDate');
   const sortOrder = (String(req.query.sortOrder || 'DESC').toUpperCase() === 'ASC') ? 'ASC' : 'DESC';
 
