@@ -157,13 +157,13 @@ const Plans: React.FC = () => {
       gradient: isDark
         ? "from-gray-900 via-black to-gray-900"
         : "from-black via-gray-900 to-black",
-      price: 199,
+      price: 199.99,
       originalPrice: 499,
       features: [
         { icon: Flame, text: "LIFETIME ACCESS - Forever!", highlight: true },
         { icon: Check, text: "Everything in DIAMOND" },
         { icon: Crown, text: "Exclusive LIFETIME badge", highlight: true },
-        { icon: Zap, text: "5 Request tickets (10/month)", highlight: true },
+        { icon: Zap, text: "2 Request tickets (2/month)", highlight: true },
         { icon: Star, text: "Never pay again!", highlight: true },
         { icon: Check, text: "All future features included" },
         { icon: Check, text: "VIP priority support 24/7" },

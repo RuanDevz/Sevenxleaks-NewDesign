@@ -23,6 +23,7 @@ const BlackFridayBanner: React.FC = () => {
 
     const updateTimer = () => {
       const now = new Date();
+      now.setHours(now.getHours() + 3); // AQUI: adiciona +3 horas
       const diff = endDate.getTime() - now.getTime();
 
       if (diff <= 0) {
