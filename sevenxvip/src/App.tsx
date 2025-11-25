@@ -80,7 +80,6 @@ const App = () => {
   return (
     <Router>
       <div className="flex flex-col min-h-screen">
-        {/* Header: VIP > Logado > Padrão */}
         {hasPermission.vip ? (
           <VIPHeader />
         ) : isAuthenticated ? (

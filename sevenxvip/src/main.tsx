@@ -4,6 +4,7 @@ import App from './App';
 import './index.css';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { RegionProvider } from './contexts/RegionContext';
+import BlackFridayBanner from './components/BlackFridayBanner';
 
 
 
@@ -12,6 +13,7 @@ root.render(
   <React.StrictMode>
     <ThemeProvider>
       <RegionProvider>
+              
         <App />
       </RegionProvider>
     </ThemeProvider>

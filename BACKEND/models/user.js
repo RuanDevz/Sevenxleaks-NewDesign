@@ -59,12 +59,12 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
       vipTier: {
-        type: DataTypes.ENUM('diamond', 'titanium'),
+        type: DataTypes.ENUM('diamond', 'titanium', 'vitality'),
         allowNull: true,
         defaultValue: null,
       },
       subscriptionType: {
-        type: DataTypes.ENUM('monthly', 'annual'),
+        type: DataTypes.ENUM('monthly', 'annual', 'vitality'),
         allowNull: true,
         defaultValue: null,
       },

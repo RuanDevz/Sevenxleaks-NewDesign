@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Loading from "../components/Loading/Loading";
 import { motion, AnimatePresence } from "framer-motion";
-import { Crown, Check, Zap, MessageCircle, Star, Trophy, X } from "lucide-react";
+import { Crown, Check, Zap, MessageCircle, Star, Trophy, X, Flame } from "lucide-react";
 import { useTheme } from "../contexts/ThemeContext";
 import { Helmet } from "react-helmet";
 
@@ -52,7 +52,7 @@ const Plans: React.FC = () => {
     checkAuthAndVipStatus();
   }, [token, email]);
 
-  const handleAccessClick = async (vipTier: "diamond" | "titanium") => {
+  const handleAccessClick = async (vipTier: "diamond" | "titanium" | "vitality") => {
     const token = localStorage.getItem("Token");
     const email = localStorage.getItem("email");
 
@@ -150,28 +150,27 @@ const Plans: React.FC = () => {
         { icon: Star, text: billingCycle === "annual" ? "2 Request tickets (2/month)" : "1 Request tickets (1/month)", highlight: true },
       ]
     },
-    titanium: {
-      name: "VIP TITANIUM",
-      icon: Trophy,
-      color: "yellow",
+    vitality: {
+      name: "BLACK FRIDAY VITALITY",
+      icon: Flame,
+      color: "red",
       gradient: isDark
-        ? "from-yellow-500 to-orange-500"
-        : "from-yellow-600 to-orange-600",
-      price: {
-        monthly: 45,
-        annual: 299
-      },
+        ? "from-red-600 via-orange-600 to-red-600"
+        : "from-red-700 via-orange-700 to-red-700",
+      price: 199,
+      originalPrice: 499,
       features: [
+        { icon: Flame, text: "LIFETIME ACCESS - Forever!", highlight: true },
         { icon: Check, text: "Everything in DIAMOND" },
-        { icon: Trophy, text: "VIP Discord TITANIUM badge", highlight: true },
-        { icon: Zap, text: "5 Request tickets (5/month)", highlight: true },
-        { icon: Check, text: "Highest priority support" },
-        { icon: Check, text: "Exclusive TITANIUM content" },
-        { icon: Check, text: "Beta features access" },
-        { icon: MessageCircle, text: "Direct line to admin team" },
-        { icon: Star, text: "Custom profile flair", highlight: true },
+        { icon: Crown, text: "Exclusive VITALITY badge", highlight: true },
+        { icon: Zap, text: "10 Request tickets (10/month)", highlight: true },
+        { icon: Star, text: "Never pay again!", highlight: true },
+        { icon: Check, text: "All future features included" },
+        { icon: Check, text: "VIP priority support 24/7" },
+        { icon: MessageCircle, text: "Direct line to founders" },
       ],
-      isPopular: true
+      isPopular: true,
+      isLimited: true
     }
   };
 
@@ -366,13 +365,114 @@ const Plans: React.FC = () => {
               </button>
             </motion.div>
 
+            {/* Vitality Plan */}
+            <motion.div
+              key="vitality"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3, delay: 0.05 }}
+              className={`relative rounded-2xl p-6 border-4 backdrop-blur-xl ${
+                isDark
+                  ? 'bg-gradient-to-br from-gray-800/80 via-red-900/20 to-gray-800/80 border-red-500/70 hover:border-red-400/90'
+                  : 'bg-gradient-to-br from-white/90 via-red-50/50 to-white/90 border-red-500/80 hover:border-red-600/100'
+              } shadow-2xl hover:shadow-red-500/40 transition-all duration-300`}
+            >
+              {/* Fire animation background */}
+              <div className="absolute inset-0 rounded-2xl overflow-hidden opacity-20">
+                <div className="absolute top-0 left-1/4 w-32 h-32 bg-red-500 rounded-full blur-3xl animate-pulse"></div>
+                <div className="absolute bottom-0 right-1/4 w-32 h-32 bg-orange-500 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+              </div>
+
+              <div className={`absolute -top-3 left-1/2 transform -translate-x-1/2 px-4 py-1 rounded-full font-black text-xs ${
+                isDark
+                  ? 'bg-gradient-to-r from-red-600 via-orange-600 to-red-600 text-white'
+                  : 'bg-gradient-to-r from-red-700 via-orange-700 to-red-700 text-white'
+              } shadow-2xl border-2 border-yellow-400 animate-bounce`}>
+                🔥 LIMITED TIME
+              </div>
+
+              <div className="flex items-center gap-3 mb-4 mt-2 relative">
+                <div className={`p-3 rounded-xl bg-gradient-to-br ${plans.vitality.gradient} shadow-lg animate-pulse`}>
+                  <Flame className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className={`text-xl font-bold font-orbitron ${
+                    isDark
+                      ? 'text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400'
+                      : 'text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-orange-600 to-yellow-600'
+                  }`}>
+                    VITALITY
+                  </h3>
+                  <p className={`text-xs font-bold ${isDark ? 'text-red-400' : 'text-red-600'}`}>
+                    Lifetime Access
+                  </p>
+                </div>
+              </div>
+
+              <div className="mb-6 relative">
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-2xl font-bold line-through ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                    ${plans.vitality.originalPrice}
+                  </span>
+                  <span className={`text-4xl font-black font-orbitron ${
+                    isDark
+                      ? 'text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400'
+                      : 'text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-600'
+                  }`}>
+                    ${plans.vitality.price}
+                  </span>
+                </div>
+                <p className={`text-xs mt-2 font-bold ${isDark ? 'text-green-400' : 'text-green-600'}`}>
+                  Save $300 (60% OFF)
+                </p>
+              </div>
+
+              <ul className="space-y-3 mb-6 relative">
+                {plans.vitality.features.map((feature, index) => (
+                  <motion.li
+                    key={index}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="flex items-start gap-3"
+                  >
+                    <feature.icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
+                      feature.highlight
+                        ? 'text-red-500'
+                        : isDark ? 'text-orange-400' : 'text-orange-600'
+                    }`} />
+                    <span className={`text-sm ${
+                      feature.highlight
+                        ? 'font-bold text-red-500'
+                        : isDark ? 'text-gray-300' : 'text-gray-700'
+                    }`}>
+                      {feature.text}
+                    </span>
+                  </motion.li>
+                ))}
+              </ul>
+
+              <button
+                onClick={() => handleAccessClick("vitality")}
+                className={`relative w-full py-3 rounded-xl font-bold text-base transition-all duration-300 overflow-hidden group ${
+                  isDark
+                    ? 'bg-gradient-to-r from-red-600 via-orange-600 to-red-600 hover:from-red-500 hover:via-orange-500 hover:to-red-500 text-white'
+                    : 'bg-gradient-to-r from-red-700 via-orange-700 to-red-700 hover:from-red-600 hover:via-orange-600 hover:to-red-600 text-white'
+                } shadow-2xl hover:shadow-red-500/50 hover:scale-105 border-2 border-yellow-400`}
+              >
+                <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 group-hover:animate-shine"></span>
+                <span className="relative">🔥 Claim Lifetime Access</span>
+              </button>
+            </motion.div>
+
             {/* Diamond Plan */}
             <motion.div
               key={`diamond-${billingCycle}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
               className={`relative rounded-2xl p-6 border-2 backdrop-blur-xl ${
                 isDark
                   ? 'bg-gray-800/60 border-blue-500/30 hover:border-blue-400/50'
@@ -450,7 +550,7 @@ const Plans: React.FC = () => {
               </button>
             </motion.div>
 
-            {/* Titanium Plan 
+            {/* Titanium Plan
             <motion.div
               key={`titanium-${billingCycle}`}
               initial={{ opacity: 0, y: 20 }}

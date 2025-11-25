@@ -97,7 +97,9 @@ router.post(
 
     switch (event.type) {
       // ————————————————————————————————————————————————————————————————
-      // CHECKOUT CONCLUÍDO: não creditar tempo aqui; apenas vincular IDs e metadata
+      // CHECKOUT CONCLUÍDO:
+      // - Para Vitality (payment mode): ativar VIP imediatamente com 999999 dias
+      // - Para outros (subscription mode): apenas vincular IDs e metadata
       // ————————————————————————————————————————————————————————————————
       case 'checkout.session.completed': {
         const session = event.data.object;
@@ -124,31 +126,70 @@ router.post(
           const vipTier = session.metadata?.vipTier || 'diamond';
           const subscriptionType = session.metadata?.subscriptionType || 'monthly';
 
-          // Apenas vincule IDs. NÃO atualize isVip/vipExpirationDate aqui.
-          await user.update({
-            stripeSubscriptionId: session.subscription || user.stripeSubscriptionId || null,
-            stripeCustomerId: session.customer || user.stripeCustomerId || null,
-            vipTier: vipTier,
-            subscriptionType: subscriptionType,
-          });
+          // Verificar se é Vitality (pagamento único - mode: 'payment')
+          if (vipTier === 'vitality' && session.mode === 'payment' && session.payment_status === 'paid') {
+            // Vitality: ativar VIP imediatamente com 999999 dias
+            const now = new Date();
+            const lifetimeExpiration = new Date(now.getTime() + (999999 * 24 * 60 * 60 * 1000));
+            const resetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-          // Escreve metadados estáveis no Stripe
-          try {
-            if (session.subscription) {
-              await stripe.subscriptions.update(session.subscription, {
-                metadata: { userId: String(user.id) }
-              });
+            await user.update({
+              isVip: true,
+              vipExpirationDate: lifetimeExpiration,
+              stripeCustomerId: session.customer || user.stripeCustomerId || null,
+              vipTier: 'vitality',
+              subscriptionType: 'lifetime',
+              requestTickets: 10,
+              requestTicketsResetDate: resetDate,
+            });
+
+            console.log(`VIP Vitality (lifetime) ativado para: ${user.email}`);
+
+            // NFSe para Vitality
+            try {
+              const customer = session.customer
+                ? await stripe.customers.retrieve(session.customer)
+                : null;
+              const fakeInvoice = {
+                id: session.id,
+                amount_paid: session.amount_total,
+                currency: session.currency,
+                customer_email: customerEmail,
+              };
+              const payload = buildFromInvoice(fakeInvoice, customer);
+              process.nextTick(() =>
+                processaNFSe(session.id, payload).catch(e => console.error('NFSe async error', e))
+              );
+            } catch (nfseErr) {
+              console.error('Falha na preparação/envio da NFSe', nfseErr);
             }
-            if (session.customer) {
-              await stripe.customers.update(session.customer, {
-                metadata: { userId: String(user.id) }
-              });
+          } else {
+            // Outros planos: apenas vincule IDs. NÃO atualize isVip/vipExpirationDate aqui.
+            await user.update({
+              stripeSubscriptionId: session.subscription || user.stripeSubscriptionId || null,
+              stripeCustomerId: session.customer || user.stripeCustomerId || null,
+              vipTier: vipTier,
+              subscriptionType: subscriptionType,
+            });
+
+            // Escreve metadados estáveis no Stripe
+            try {
+              if (session.subscription) {
+                await stripe.subscriptions.update(session.subscription, {
+                  metadata: { userId: String(user.id) }
+                });
+              }
+              if (session.customer) {
+                await stripe.customers.update(session.customer, {
+                  metadata: { userId: String(user.id) }
+                });
+              }
+            } catch (e) {
+              console.error('Falha ao atualizar metadata no Stripe', e);
             }
-          } catch (e) {
-            console.error('Falha ao atualizar metadata no Stripe', e);
           }
 
-          // E-mail de confirmação pode ser mantido
+          // E-mail de confirmação
           await sendConfirmationEmail(customerEmail);
           return res.status(200).send({ received: true });
         } catch (err) {
@@ -192,27 +233,37 @@ router.post(
             return res.status(404).send('Usuário não encontrado');
           }
 
-          // Use o período oficial da Stripe (evita +60 dias no primeiro ciclo)
-          const periodEnd = toDateFromUnix(subscription.current_period_end);
-          if (!periodEnd) {
-            console.error('current_period_end ausente na assinatura');
-            return res.status(400).send('Período da assinatura indisponível');
-          }
-
-          // Não reduzir validade se houver data futura maior já registrada
-          const currentExp = user.vipExpirationDate ? new Date(user.vipExpirationDate) : null;
-          const newExpiration =
-            currentExp && currentExp > periodEnd ? currentExp : periodEnd;
-
-          // Determinar quantidade de tickets baseado no tier e tipo de subscrição
+          // Determinar tier e tipo de subscrição
           const vipTier = subscription.metadata?.vipTier || user.vipTier || 'diamond';
           const subscriptionType = subscription.metadata?.subscriptionType || user.subscriptionType || 'monthly';
 
+          // Verificar se é plano vitality (lifetime)
+          let newExpiration;
           let requestTickets = 0;
-          if (vipTier === 'diamond') {
-            requestTickets = subscriptionType === 'annual' ? 2 : 1;
-          } else if (vipTier === 'titanium') {
-            requestTickets = 5;
+
+          if (vipTier === 'vitality') {
+            // Plano vitalício: adicionar 999999 dias a partir de agora
+            const now = new Date();
+            newExpiration = new Date(now.getTime() + (999999 * 24 * 60 * 60 * 1000));
+            requestTickets = 10;
+          } else {
+            // Planos normais: usar o período oficial da Stripe
+            const periodEnd = toDateFromUnix(subscription.current_period_end);
+            if (!periodEnd) {
+              console.error('current_period_end ausente na assinatura');
+              return res.status(400).send('Período da assinatura indisponível');
+            }
+
+            // Não reduzir validade se houver data futura maior já registrada
+            const currentExp = user.vipExpirationDate ? new Date(user.vipExpirationDate) : null;
+            newExpiration = currentExp && currentExp > periodEnd ? currentExp : periodEnd;
+
+            // Determinar quantidade de tickets baseado no tier
+            if (vipTier === 'diamond') {
+              requestTickets = subscriptionType === 'annual' ? 2 : 1;
+            } else if (vipTier === 'titanium') {
+              requestTickets = 5;
+            }
           }
 
           // Definir data de reset dos tickets (próximo mês)
