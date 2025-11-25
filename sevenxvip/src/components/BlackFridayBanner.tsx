@@ -85,7 +85,7 @@ const BlackFridayBanner: React.FC = () => {
               Black Friday <span className="hidden sm:inline">Sale</span>
             </h2>
             <p className="text-[9px] sm:text-[10px] text-gray-400 font-medium hidden sm:block leading-tight">
-              Save <span className="text-red-400 font-bold">40%</span>
+              Save <span className="text-red-400 font-bold">60%</span>
             </p>
           </div>
         </div>
