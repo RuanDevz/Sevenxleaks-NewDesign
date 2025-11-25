@@ -98,7 +98,7 @@ router.post(
     switch (event.type) {
       // ————————————————————————————————————————————————————————————————
       // CHECKOUT CONCLUÍDO:
-      // - Para Vitality (payment mode): ativar VIP imediatamente com 999999 dias
+      // - Para lifetime (payment mode): ativar VIP imediatamente com 999999 dias
       // - Para outros (subscription mode): apenas vincular IDs e metadata
       // ————————————————————————————————————————————————————————————————
       case 'checkout.session.completed': {
@@ -126,9 +126,9 @@ router.post(
           const vipTier = session.metadata?.vipTier || 'diamond';
           const subscriptionType = session.metadata?.subscriptionType || 'monthly';
 
-          // Verificar se é Vitality (pagamento único - mode: 'payment')
-          if (vipTier === 'vitality' && session.mode === 'payment' && session.payment_status === 'paid') {
-            // Vitality: ativar VIP imediatamente com 999999 dias
+          // Verificar se é lifetime (pagamento único - mode: 'payment')
+          if (vipTier === 'lifetime' && session.mode === 'payment' && session.payment_status === 'paid') {
+            // lifetime: ativar VIP imediatamente com 999999 dias
             const now = new Date();
             const lifetimeExpiration = new Date(now.getTime() + (999999 * 24 * 60 * 60 * 1000));
             const resetDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -137,15 +137,15 @@ router.post(
               isVip: true,
               vipExpirationDate: lifetimeExpiration,
               stripeCustomerId: session.customer || user.stripeCustomerId || null,
-              vipTier: 'vitality',
+              vipTier: 'lifetime',
               subscriptionType: 'lifetime',
               requestTickets: 10,
               requestTicketsResetDate: resetDate,
             });
 
-            console.log(`VIP Vitality (lifetime) ativado para: ${user.email}`);
+            console.log(`VIP lifetime (lifetime) ativado para: ${user.email}`);
 
-            // NFSe para Vitality
+            // NFSe para lifetime
             try {
               const customer = session.customer
                 ? await stripe.customers.retrieve(session.customer)
@@ -237,11 +237,11 @@ router.post(
           const vipTier = subscription.metadata?.vipTier || user.vipTier || 'diamond';
           const subscriptionType = subscription.metadata?.subscriptionType || user.subscriptionType || 'monthly';
 
-          // Verificar se é plano vitality (lifetime)
+          // Verificar se é plano lifetime (lifetime)
           let newExpiration;
           let requestTickets = 0;
 
-          if (vipTier === 'vitality') {
+          if (vipTier === 'lifetime') {
             // Plano vitalício: adicionar 999999 dias a partir de agora
             const now = new Date();
             newExpiration = new Date(now.getTime() + (999999 * 24 * 60 * 60 * 1000));
