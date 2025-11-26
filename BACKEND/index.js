@@ -170,11 +170,6 @@ const initializeDatabase = async () => {
     try {
       await db.sequelize.authenticate();
       console.log('✅ Conexão Sequelize estabelecida com sucesso.');
-
-      const tablesCreated = await db.createTablesIfNotExist();
-      if (tablesCreated) {
-        console.log('✅ Database initialization completed.');
-      }
       return true;
     } catch (error) {
       console.error(`❌ Tentativa ${attempt}/${maxRetries} falhou:`, error.message);
