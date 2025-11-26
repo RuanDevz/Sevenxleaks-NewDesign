@@ -15,7 +15,7 @@ const {
 } = require('../models');
 
 /** =========================
- *  Utilidades de codificação
+ *  Utilidades
  *  ========================= */
 function insertRandomChar(base64Str) {
   const letters = 'abcdefghijklmnopqrstuvwxyz';
@@ -30,7 +30,7 @@ function encodePayloadToBase64(payload) {
 }
 
 /** ==========================================
- *  Filtro de datas baseado em postDate (robusto)
+ *  Filtro de datas baseado em postDate
  *  ========================================== */
 function createDateFilter(dateFilter, month) {
   const today = new Date();
@@ -62,7 +62,7 @@ function createDateFilter(dateFilter, month) {
   const where = {};
   const start = new Date(today);
   const end = new Date(today);
-  end.setDate(end.getDate() + 1); // exclusivo
+  end.setDate(end.getDate() + 1);
 
   switch (df) {
     case 'today':
@@ -99,16 +99,13 @@ function createDateFilter(dateFilter, month) {
       where.postDate = { [Op.gte]: s, [Op.lt]: e };
       break;
     }
-    default:
-      // sem filtro de data
-      break;
   }
 
   return where;
 }
 
 /** ===================================
- *  Busca por modelo SEM paginação aqui
+ *  Busca por modelo — otimizada
  *  =================================== */
 async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categories, region) {
   const where = { ...whereClause };
@@ -126,16 +123,14 @@ async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categor
     where.category = { [Op.in]: categories };
   }
 
-  // Colunas diferentes para VIP e não VIP
   const normalAttributes = ['id', 'name', 'slug', 'category', 'preview', 'postDate', 'createdAt'];
   const vipAttributes = ['id', 'name', 'slug', 'category', 'postDate', 'createdAt'];
 
-  const attributes = ['Vip' + model.name] // modelo VIP
-    ? vipAttributes
-    : normalAttributes;
+  const isVIP = [
+    'VipAsianContent', 'VipWesternContent',
+    'VipBannedContent', 'VipUnknownContent'
+  ].includes(model.name);
 
-  // Melhor forma: checar se é VIP pelo nome do modelo
-  const isVIP = ['VipAsianContent', 'VipWesternContent', 'VipBannedContent', 'VipUnknownContent'].includes(model.name);
   const cols = isVIP ? vipAttributes : normalAttributes;
 
   return model.findAll({
@@ -146,7 +141,7 @@ async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categor
       ['id', sortOrder],
     ],
     attributes: cols,
-    limit: 2000,
+    limit: 300, // 🔥 antes era 2000 — Causa timeout no Supabase
     raw: true,
   }).catch(err => {
     console.error(`[safeModelSearch] Query error for model ${model.name}:`, err.message);
@@ -154,9 +149,8 @@ async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categor
   });
 }
 
-
 /** ============================
- *  Mapa de fontes / contentType
+ *  Fontes disponíveis
  *  ============================ */
 const SOURCES = [
   { key: 'asian',       model: AsianContent,      contentType: 'asian' },
@@ -170,91 +164,60 @@ const SOURCES = [
 ];
 
 /** ===========================
- *  Rota GET /universal-search
+ *  Rota GET /search
  *  =========================== */
 router.get('/search', async (req, res) => {
   const t0 = Date.now();
 
-  // Query params com defaults seguros
-  const page = Math.max(parseInt(req.query.page || '1', 10), 1);
-  const limit = Math.min(Math.max(parseInt(req.query.limit || '300', 10), 1), 500);
-  const sortBy = (req.query.sortBy || 'postDate');
+  const page = Math.max(parseInt(req.query.page || '1'), 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit || '300'), 1), 500);
+  const sortBy = req.query.sortBy || 'postDate';
   const sortOrder = (String(req.query.sortOrder || 'DESC').toUpperCase() === 'ASC') ? 'ASC' : 'DESC';
 
-  // Compatibilidade: aceita tanto 'q' quanto 'search'
   const q = (req.query.q ?? req.query.search)?.toString().trim() || undefined;
-
-  // Categoria única ou CSV
   const categories = req.query.categories
-    ? String(req.query.categories).split(',').map(s => s.trim()).filter(Boolean)
-    : (req.query.category ? [String(req.query.category).trim()] : undefined);
+    ? req.query.categories.split(',').map(s => s.trim()).filter(Boolean)
+    : (req.query.category ? [req.query.category.trim()] : undefined);
 
   const dateFilter = req.query.dateFilter;
-  const month = req.query.month ? parseInt(req.query.month, 10) : undefined;
+  const month = req.query.month ? parseInt(req.query.month) : undefined;
   const region = req.query.region ? String(req.query.region).trim() : undefined;
 
-  // Filtro de fonte
   const contentType = (req.query.contentType || 'all').toString();
 
-  // DEBUG helpers
-  const wantRaw = String(req.query.raw || '0') === '1';
-  const wantDebug = String(req.query.debug || '0') === '1';
+  const wantRaw = req.query.raw === '1';
+  const wantDebug = req.query.debug === '1';
 
   try {
-    const { sequelize } = require('../models');
-
-    try {
-      await sequelize.authenticate();
-    } catch (dbErr) {
-      console.error('[UniversalSearch] Database connection failed:', dbErr.message);
-      const emergencyPayload = {
-        page,
-        perPage: limit,
-        total: 0,
-        totalPages: 0,
-        data: [],
-        error: 'DB_CONNECTION_FAILED',
-        message: 'Database temporarily unavailable',
-        searchTime: Date.now() - t0,
-      };
-      const encodedPayload = encodePayloadToBase64(emergencyPayload);
-      return res.status(200).json({ data: encodedPayload });
-    }
     const whereDate = createDateFilter(dateFilter, month);
 
-    // Define fontes a consultar
     const selectedSources = SOURCES.filter(src => {
       if (contentType === 'all') return true;
       return src.key === contentType || src.contentType === contentType;
     });
 
-    console.info(`[UniversalSearch] selectedSources: ${selectedSources.map(s => s.key).join(', ') || '(none)'} | q:${q || '-'} | categories:${categories ? categories.join(',') : '-'}`);
+    // 🔥 evita saturar a pool do Supabase — executa até 3 buscas por vez
+    const concurrencyLimit = 3;
+    let index = 0;
+    const results = [];
 
-    // Execução concorrente sem paginação por modelo
-    const parts = await Promise.all(
-      selectedSources.map(async (src) => {
-        try {
-          console.debug(`[UniversalSearch] searching model=${src.key}`);
+    while (index < selectedSources.length) {
+      const slice = selectedSources.slice(index, index + concurrencyLimit);
 
+      const part = await Promise.all(
+        slice.map(async (src) => {
           const rows = await safeModelSearch(src.model, whereDate, sortBy, sortOrder, q, categories, region);
-
-          console.info(`[UniversalSearch] model=${src.key} returned ${Array.isArray(rows) ? rows.length : 0} rows`);
-
-          // defensive: ensure rows is array
-          if (!Array.isArray(rows)) return [];
-
           return rows.map(r => ({ ...r, contentType: src.contentType }));
-        } catch (err) {
-          console.error(`[UniversalSearch] error querying model=${src.key}:`, err.message);
-          return [];
-        }
-      })
-    );
+        })
+      );
 
-    // Merge
-    let allResults = parts.flat();
+      results.push(...part.flat());
+      index += concurrencyLimit;
+    }
 
-    // Ordenação estável global
+    let allResults = results;
+
+    // Ordenação global
     allResults.sort((a, b) => {
       const ap = new Date(a.postDate || a.createdAt).getTime();
       const bp = new Date(b.postDate || b.createdAt).getTime();
@@ -264,18 +227,16 @@ router.get('/search', async (req, res) => {
       const bc = new Date(b.createdAt).getTime();
       if (ac !== bc) return sortOrder === 'DESC' ? (bc - ac) : (ac - bc);
 
-      const ai = typeof a.id === 'number' ? a.id : Number(a.id) || 0;
-      const bi = typeof b.id === 'number' ? b.id : Number(b.id) || 0;
-      return sortOrder === 'DESC' ? (bi - ai) : (ai - bi);
+      return sortOrder === 'DESC'
+        ? (Number(b.id) - Number(a.id))
+        : (Number(a.id) - Number(b.id));
     });
 
-    // Paginação única
     const total = allResults.length;
     const totalPages = Math.max(Math.ceil(total / limit), 1);
     const offset = (page - 1) * limit;
     const data = allResults.slice(offset, offset + limit);
 
-    // Payload + codificação
     const payload = {
       page,
       perPage: limit,
@@ -285,35 +246,26 @@ router.get('/search', async (req, res) => {
       searchTime: Date.now() - t0,
     };
 
-    if (wantDebug) {
-      // Retorna payload não codificado para facilitar debug (não usar em produção sem proteção)
-      console.warn('[UniversalSearch] debug payload requested (raw JSON response)');
-      return res.status(200).json({ debug: true, payload });
-    }
+    if (wantDebug) return res.status(200).json({ debug: true, payload });
+    if (wantRaw) return res.status(200).json({ data: payload });
 
-    if (wantRaw) {
-      // Retorna sem ofuscação (útil para verificar se o DB está realmente retornando registros)
-      return res.status(200).json({ data: payload });
-    }
+    return res.status(200).json({ data: encodePayloadToBase64(payload) });
 
-    const encodedPayload = encodePayloadToBase64(payload);
-    return res.status(200).json({ data: encodedPayload });
   } catch (err) {
-    console.error('[UniversalSearch] fatal error:', err && err.stack ? err.stack : err);
+    console.error('[UniversalSearch] fatal error:', err.message);
 
-    // Resposta de contingência também codificada
-    const emergencyPayload = {
-      page: Math.max(parseInt(req.query.page || '1', 10), 1),
-      perPage: Math.min(Math.max(parseInt(req.query.limit || '300', 10), 1), 500),
+    const emergency = {
+      page,
+      perPage: limit,
       total: 0,
       totalPages: 0,
       data: [],
       error: 'SEARCH_FAILED',
-      message: err?.message || 'Erro interno ao processar a busca.',
+      message: err.message,
       searchTime: Date.now() - t0,
     };
-    const encodedPayload = encodePayloadToBase64(emergencyPayload);
-    return res.status(200).json({ data: encodedPayload });
+
+    return res.status(200).json({ data: encodePayloadToBase64(emergency) });
   }
 });
 
