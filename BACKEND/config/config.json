@@ -16,30 +16,6 @@
   "production": {
     "use_env_variable": "POSTGRES_URL",
     "dialect": "postgres",
-    "logging": false,
-    "dialectOptions": {
-      "ssl": { 
-        "require": true, 
-        "rejectUnauthorized": false 
-      },
-      "connectTimeout": 35000,
-      "socketTimeout": 15000,
-      "keepAlive": true,
-      "keepAliveInitialDelayMillis": 0,
-      "statement_timeout": 10000,
-      "query_timeout": 10000,
-      "idle_in_transaction_session_timeout": 8000
-    },
-    "pool": { 
-      "max": 5, 
-      "min": 0, 
-      "idle": 2000, 
-      "acquire": 10000,
-      "evict": 1000,
-      "handleDisconnects": true
-    },
-    "retry": {
-      "max": 2
-    }
-  }
+    "logging": false
+}
 }
