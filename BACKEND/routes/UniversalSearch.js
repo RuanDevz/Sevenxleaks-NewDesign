@@ -141,7 +141,7 @@ async function safeModelSearch(model, whereClause, sortBy, sortOrder, q, categor
       ['id', sortOrder],
     ],
     attributes: cols,
-    limit: 300, // 🔥 antes era 2000 — Causa timeout no Supabase
+    limit: 300,
     raw: true,
   }).catch(err => {
     console.error(`[safeModelSearch] Query error for model ${model.name}:`, err.message);
