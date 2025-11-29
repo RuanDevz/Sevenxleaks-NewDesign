@@ -73,7 +73,7 @@ const BannedContent: React.FC = () => {
         page: page.toString(),
         sortBy: "postDate",
         sortOrder: sortOption === "oldest" ? "ASC" : "DESC",
-        limit: "300",
+        limit: "110",
         category: "Banned"
       });
 

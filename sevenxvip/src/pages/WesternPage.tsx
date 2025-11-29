@@ -7,6 +7,7 @@ import { useTheme } from "../contexts/ThemeContext";
 import MonthFilter from "../components/MonthFilter";
 import CategoryFilter from "../components/CategoryFilter";
 import { PreviewModal } from "../components/PreviewModal";
+import { useContentStore } from "../store/contentStore";
 
 type LinkItem = {
   id: string;
@@ -55,6 +56,9 @@ const WesternPage: React.FC = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isDark = theme === "dark";
+
+  const { getCache, setCache, isCacheValid, appendToCache } = useContentStore();
+
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [filteredLinks, setFilteredLinks] = useState<LinkItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -70,6 +74,16 @@ const WesternPage: React.FC = () => {
   const [dateFilter, setDateFilter] = useState("all");
     const [showPreview, setShowPreview] = useState<string | null>(null);
   const [previewContentName, setPreviewContentName] = useState<string>("");
+
+  useEffect(() => {
+    const cache = getCache('western');
+    if (cache) {
+      setSearchName(cache.filters.searchName);
+      setSelectedCategory(cache.filters.selectedCategory);
+      setDateFilter(cache.filters.dateFilter);
+      setSelectedMonth(cache.filters.selectedMonth);
+    }
+  }, []);
 
   function decodeModifiedBase64<T>(encodedStr: string): T {
     const fixedBase64 = encodedStr.slice(0, 2) + encodedStr.slice(3);
@@ -87,7 +101,7 @@ const WesternPage: React.FC = () => {
         page: page.toString(),
         sortBy: "postDate",
         sortOrder: "DESC",
-        limit: "300"
+        limit: "110"
       });
 
       if (searchName) params.append('search', searchName);
@@ -121,6 +135,7 @@ const WesternPage: React.FC = () => {
       if (isLoadMore) {
         setLinks((prev) => [...prev, ...rawData]);
         setFilteredLinks((prev) => [...prev, ...rawData]);
+        appendToCache('western', rawData, page);
       } else {
         setLinks(rawData);
         setFilteredLinks(rawData);
@@ -146,6 +161,18 @@ const WesternPage: React.FC = () => {
         );
         return [...prev, ...newCategories];
       });
+
+      if (!isLoadMore) {
+        setCache('western', {
+          links: rawData,
+          categories: [...categories, ...uniqueCategories],
+          currentPage: 1,
+          totalPages,
+          hasMoreContent: hasMore,
+          filters: { searchName, selectedCategory, selectedMonth, dateFilter },
+          timestamp: Date.now(),
+        });
+      }
     } catch (error) {
       console.error("Error fetching content:", error);
     } finally {
@@ -157,6 +184,22 @@ const WesternPage: React.FC = () => {
 
 
   useEffect(() => {
+    const currentFilters = { searchName, selectedCategory, selectedMonth, dateFilter };
+
+    if (isCacheValid('western', currentFilters)) {
+      const cache = getCache('western');
+      if (cache) {
+        setLinks(cache.links);
+        setFilteredLinks(cache.links);
+        setCategories(cache.categories);
+        setCurrentPage(cache.currentPage);
+        setTotalPages(cache.totalPages);
+        setHasMoreContent(cache.hasMoreContent);
+        setLoading(false);
+        return;
+      }
+    }
+
     const timer = setTimeout(() => {
       setHasMoreContent(true);
       fetchContent(1);
